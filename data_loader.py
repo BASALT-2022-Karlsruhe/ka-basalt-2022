@@ -177,6 +177,7 @@ def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
             json_lines = json_file.readlines()
             json_data = "[" + ",".join(json_lines) + "]"
             json_data = json.loads(json_data)
+
         for i in range(len(json_data)):
             if quit_workers_event.is_set():
                 break
@@ -222,6 +223,10 @@ def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
             else:
                 print(f"Could not read frame from video {video_path}")
         video.release()
+        # Signal that this task is done
+        # Yes we are using "None"s to tell when worker is done
+        # and when individual work-items are done...
+        output_queue.put((trajectory_id, None, None), timeout=QUEUE_TIMEOUT)
         if quit_workers_event.is_set():
             break
     # Tell that we ended
@@ -242,7 +247,7 @@ class DataLoader:
     - Loads up individual files as trajectory files (i.e. if a trajectory is split into multiple files,
       this code will load it up as a separate item).
     """
-    def __init__(self, dataset_dir, n_workers=8, batch_size=8, n_epochs=1, max_queue_size=16):
+    def __init__(self, dataset_dir, n_workers=8, batch_size=8, n_epochs=1, max_queue_size=8):
         assert n_workers >= batch_size, "Number of workers must be equal or greater than batch size"
         self.dataset_dir = dataset_dir
         self.n_workers = n_workers
@@ -317,6 +322,7 @@ class DataLoader:
         return batch_frames, batch_actions, batch_episode_id
 
     def __del__(self):
+        self.quit_workers_event.set()
         for process in self.processes:
             process.terminate()
             process.join()
