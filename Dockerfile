@@ -29,3 +29,5 @@ RUN conda env update --name minerl -f environment.yml --prune
 
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
+
+CMD ["xvfb-run", "python", "/home/aicrowd/train.py"]
