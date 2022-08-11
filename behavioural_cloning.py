@@ -17,14 +17,19 @@ from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 
-EPOCHS = 2
+# Originally this code was designed for a small dataset of ~20 demonstrations per task.
+# The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
+# Use this flag to switch between the two settings
+USING_FULL_DATASET = True
+
+EPOCHS = 1 if USING_FULL_DATASET else 2
 # Needs to be <= number of videos
-BATCH_SIZE = 16
+BATCH_SIZE = 64 if USING_FULL_DATASET else 16
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 20
+N_WORKERS = 100 if USING_FULL_DATASET else 20
 DEVICE = "cuda"
 
 LOSS_REPORT_RATE = 100
@@ -37,6 +42,8 @@ WEIGHT_DECAY = 0.0
 # KL loss to the original model was not used in OpenAI VPT
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
+
+MAX_BATCHES = 2000 if USING_FULL_DATASET else int(1e9)
 
 def load_model_parameters(path_to_model_file):
     agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -62,7 +69,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     policy = agent.policy
     original_policy = original_agent.policy
 
-    # Freeze most params
+    # Freeze most params if using small dataset
     for param in policy.parameters():
         param.requires_grad = False
     # Unfreeze final layers
@@ -85,7 +92,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         dataset_dir=data_dir,
         n_workers=N_WORKERS,
         batch_size=BATCH_SIZE,
-        n_epochs=EPOCHS
+        n_epochs=EPOCHS,
     )
 
     start_time = time.time()
@@ -101,6 +108,13 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(data_loader):
         batch_loss = 0
         for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
+            if image is None and action is None:
+                # A work-item was done. Remove hidden state
+                if episode_id in episode_hidden_states:
+                    removed_hidden_state = episode_hidden_states.pop(episode_id)
+                    del removed_hidden_state
+                continue
+
             agent_action = agent._env_action_to_agent(action, to_torch=True, check_if_null=True)
             if agent_action is None:
                 # Action was null
@@ -108,8 +122,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
             agent_obs = agent._env_obs_to_agent({"pov": image})
             if episode_id not in episode_hidden_states:
-                # TODO need to clean up this hidden state after worker is done with the work item.
-                #      Leaks memory, but not tooooo much at these scales (will be a problem later).
                 episode_hidden_states[episode_id] = policy.initial_state(1)
             agent_state = episode_hidden_states[episode_id]
 
@@ -151,9 +163,11 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             print(f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}")
             loss_sum = 0
 
+        if batch_i > MAX_BATCHES:
+            break
+
     state_dict = policy.state_dict()
     th.save(state_dict, out_weights)
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
