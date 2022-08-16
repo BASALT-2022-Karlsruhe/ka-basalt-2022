@@ -6,7 +6,7 @@
 CONTAINER_NAME=kabasalt
 ```
 
-2. Build container and start docker container with ka_basalt (More info about ka_basalt here: https://github.com/BASALT-2022-Karlsruhe/ka_basalt)
+2. Build container and start docker container 
 ```shell
 sh run.sh
 ```
