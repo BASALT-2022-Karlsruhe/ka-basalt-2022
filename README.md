@@ -16,5 +16,4 @@ This starts the file `train.py`
 ## Logs
 You can view the outputs of the container by doing:
 ```shell
-docker logs -f kabasalt_experiment
-```
+docker logs -f kabasalt
