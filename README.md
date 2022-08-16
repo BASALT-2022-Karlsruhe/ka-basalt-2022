@@ -1,6 +1,7 @@
 # Getting started
 
-1. Create an .env file with UDI, GID, GIT_ACCESS_TOKEN
+1. Create an .env file in project's root folder and add:
+
 ```shell
 CONTAINER_NAME=kabasalt
 ```
