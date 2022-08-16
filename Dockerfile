@@ -6,6 +6,13 @@
 # This is done to save time during the submissions and faster debugging for you.
 FROM aicrowd/base-images:minerl-22-base
 
+# ---------------------------------------------
+# Project-specific System Dependencies
+# ---------------------------------------------
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb
+USER aicrowd
+
 # Install needed apt packages
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
@@ -30,8 +37,28 @@ RUN conda env update --name minerl -f environment.yml --prune
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
 
-#VOLUME /data
-#COPY data_loader.py data_loader.py
-#RUN python data_loader.py
+# ---------------------------------------------
+# Build Python depencies and utilize caching
+# ---------------------------------------------
 
-CMD ["xvfb-run", "python", "/home/aicrowd/train.py"]
+RUN python3 --version
+RUN pip3 install --no-cache-dir --upgrade pip
+RUN pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+RUN pip3 install -r /home/aicrowd/requirements.txt
+
+# ---------------------------------------------
+# Download data
+# ---------------------------------------------
+## Demonstrations # TODO: Fix downloading demonstrations... Are they in the wrong place?
+RUN python3 data_loader.py --json-file find-cave-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltFindCave-v0 --num-demos 2
+RUN python3 data_loader.py --json-file build-house-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltBuildVillageHouse-v0 --num-demos 1
+RUN python3 data_loader.py --json-file pen-animals-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltCreateVillageAnimalPen-v0 --num-demos 1
+RUN python3 data_loader.py --json-file waterfall-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltMakeWaterfall-v0 --num-demos 1
+
+## Model & Weights
+RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.model -P /home/aicrowd/data/VPT-models
+RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.weights -P /home/aicrowd/data/VPT-models
+
+RUN chown -R 1001:1001 /home/aicrowd/data/
+
+CMD ["xvfb-run", "python3", "/home/aicrowd/train.py"]
