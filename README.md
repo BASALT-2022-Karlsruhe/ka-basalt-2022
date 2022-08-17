@@ -3,7 +3,7 @@
 1. Create an .env file in project's root folder and add:
 
 ```shell
-CONTAINER_NAME=kabasalt
+CONTAINER_NAME=kabasalt # You can change the name if you have multiple containers...
 ```
 
 2. Build container and start docker container 
