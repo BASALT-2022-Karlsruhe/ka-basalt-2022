@@ -6,12 +6,7 @@
 # This is done to save time during the submissions and faster debugging for you.
 FROM aicrowd/base-images:minerl-22-base
 
-# ---------------------------------------------
-# Project-specific System Dependencies
-# ---------------------------------------------
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends xvfb
-USER aicrowd
+
 
 # Install needed apt packages
 ARG DEBIAN_FRONTEND=noninteractive
@@ -19,6 +14,12 @@ USER root
 COPY apt.txt apt.txt
 RUN apt -qq update && xargs -a apt.txt apt -qq install -y --no-install-recommends \
  && rm -rf /var/cache/*
+ 
+# ---------------------------------------------
+# Project-specific System Dependencies
+# ---------------------------------------------
+RUN apt-get install -y --no-install-recommends xvfb
+
 
 # Set the user and conda environment paths
 USER aicrowd
