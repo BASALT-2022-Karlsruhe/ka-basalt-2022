@@ -51,11 +51,10 @@ RUN pip3 install -r /home/aicrowd/requirements.txt
 # Download data
 # ---------------------------------------------
 ## Demonstrations # TODO: Fix downloading demonstrations... Are they in the wrong place?
-RUN python3 data_loader.py --json-file find-cave-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltFindCave-v0 --num-demos 2
-RUN python3 data_loader.py --json-file build-house-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltBuildVillageHouse-v0 --num-demos 1
-RUN python3 data_loader.py --json-file pen-animals-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltCreateVillageAnimalPen-v0 --num-demos 1
-RUN python3 data_loader.py --json-file waterfall-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltMakeWaterfall-v0 --num-demos 1
-
+RUN python3 utils/download_dataset.py --json-file /home/aicrowd/utils/data_index_files/find-cave-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltFindCave-v0 --num-demos 8
+RUN python3 utils/download_dataset.py --json-file /home/aicrowd/utils/data_index_files/build-house-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltBuildVillageHouse-v0 --num-demos 8
+RUN python3 utils/download_dataset.py --json-file /home/aicrowd/utils/data_index_files/pen-animals-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltCreateVillageAnimalPen-v0 --num-demos 8
+RUN python3 utils/download_dataset.py --json-file /home/aicrowd/utils/data_index_files/waterfall-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltMakeWaterfall-v0 --num-demos 8
 ## Model & Weights
 RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.model -P /home/aicrowd/data/VPT-models
 RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.weights -P /home/aicrowd/data/VPT-models
