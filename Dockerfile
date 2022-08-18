@@ -9,10 +9,6 @@ FROM aicrowd/base-images:minerl-22-base
 # ---------------------------------------------
 # Project-specific System Dependencies
 # ---------------------------------------------
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends xvfb
-USER aicrowd
-
 # Install needed apt packages
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
@@ -37,27 +33,7 @@ RUN conda env update --name minerl -f environment.yml --prune
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
 
-# ---------------------------------------------
-# Build Python depencies and utilize caching
-# ---------------------------------------------
-
-RUN python3 --version
-RUN pip3 install --no-cache-dir --upgrade pip
-RUN pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
-RUN pip3 install -r /home/aicrowd/requirements.txt
-
-# ---------------------------------------------
-# Download data
-# ---------------------------------------------
-## Demonstrations # TODO: Fix downloading demonstrations... Are they in the wrong place?
-RUN python3 utils/download_dataset.py --json-file /home/aicrowd/data/find-cave-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltFindCave-v0 --num-demos 8
-RUN python3 utils/download_dataset.py --json-file /home/aicrowd/data/build-house-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltBuildVillageHouse-v0 --num-demos 8
-RUN python3 utils/download_dataset.py --json-file /home/aicrowd/data/pen-animals-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltCreateVillageAnimalPen-v0 --num-demos 8
-RUN python3 utils/download_dataset.py --json-file /home/aicrowd/data/waterfall-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltMakeWaterfall-v0 --num-demos 8
-## Model & Weights
-RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.model -P /home/aicrowd/data/VPT-models
-RUN wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.weights -P /home/aicrowd/data/VPT-models
-
 RUN chown -R 1001:1001 /home/aicrowd/data/
 
+# starts train.py in headless mode on default, Specify entripoint in docker-compose.yaml if you want to override default
 CMD ["xvfb-run", "python3", "/home/aicrowd/train.py"]
