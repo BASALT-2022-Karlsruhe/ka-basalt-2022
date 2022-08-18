@@ -24,12 +24,12 @@ USING_FULL_DATASET = True
 
 EPOCHS = 1 if USING_FULL_DATASET else 2
 # Needs to be <= number of videos
-BATCH_SIZE = 64 if USING_FULL_DATASET else 16
+BATCH_SIZE = 8 if USING_FULL_DATASET else 8
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 100 if USING_FULL_DATASET else 20
+N_WORKERS = 8 if USING_FULL_DATASET else 8
 DEVICE = "cuda"
 
 LOSS_REPORT_RATE = 100
