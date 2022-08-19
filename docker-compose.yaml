@@ -24,6 +24,14 @@ services:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
         target: /home/aicrowd/data/
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: [ '0']
+              capabilities: [ gpu ]
+
 
 volumes:
   ka-basalt-2022-datadownloader_data:
