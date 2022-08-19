@@ -1,0 +1,81 @@
+Bootstrap: docker
+From: aicrowd/base-images:minerl-22-base
+Stage: spython-base
+
+%files
+    apt.txt apt.txt
+    environment.yml environment.yml
+    . /home/aicrowd
+
+%post
+    chown -R 1001:1001 /home/aicrowd
+    # In case you dont want to use Dockerfile and build from
+    # scratch, you can delete simply "Dockerfile" from your repository.
+    # Additional details on specifying dependencies are available in the README.
+
+    # Pre-installed conda and apt based MineRL runtime.
+    # This is done to save time during the submissions and faster debugging for you.
+
+    # ---------------------------------------------
+    # Project-specific System Dependencies
+    # ---------------------------------------------
+    su -  root # USER root
+    apt-get update && apt-get install -y --no-install-recommends xvfb
+    su -  aicrowd # USER aicrowd
+
+    # Install needed apt packages
+    DEBIAN_FRONTEND=noninteractive
+    su -  root # USER root
+    apt -qq update && xargs -a apt.txt apt -qq install -y --no-install-recommends \
+    && rm -rf /var/cache/*
+
+    # Set the user and conda environment paths
+    su -  aicrowd # USER aicrowd
+    HOME_DIR=/home/$USER
+    CONDA_DEFAULT_ENV="minerl"
+    PATH=/home/aicrowd/.conda/envs/minerl/bin:$PATH
+    FORCE_CUDA="1"
+
+    # Use MineRL environment
+    SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
+
+    # Conda environment update
+    conda env update --name minerl -f environment.yml --prune
+
+    # Copy the files
+
+    # ---------------------------------------------
+    # Build Python depencies and utilize caching
+    # ---------------------------------------------
+
+    python3 --version
+    pip3 install --no-cache-dir --upgrade pip
+    pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+    pip3 install -r /home/aicrowd/requirements.txt
+
+    # ---------------------------------------------
+    # Download data
+    # ---------------------------------------------
+    ## Demonstrations # TODO: Fix downloading demonstrations... Are they in the wrong place?
+    python3 data_loader.py --json-file find-cave-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltFindCave-v0 --num-demos 2
+    python3 data_loader.py --json-file build-house-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltBuildVillageHouse-v0 --num-demos 1
+    python3 data_loader.py --json-file pen-animals-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltCreateVillageAnimalPen-v0 --num-demos 1
+    python3 data_loader.py --json-file waterfall-Jul-28.json --output-dir /home/aicrowd/data/MineRLBasaltMakeWaterfall-v0 --num-demos 1
+
+    ## Model & Weights
+    wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.model -P /home/aicrowd/data/VPT-models
+    wget https://openaipublic.blob.core.windows.net/minecraft-rl/models/foundation-model-1x.weights -P /home/aicrowd/data/VPT-models
+
+    chown -R 1001:1001 /home/aicrowd/data/
+
+%environment
+    export HOME_DIR=/home/$USER
+    export CONDA_DEFAULT_ENV="minerl"
+    export PATH=/home/aicrowd/.conda/envs/minerl/bin:$PATH
+    export FORCE_CUDA="1"
+
+%runscript
+    exec /bin/bash xvfb-run python3 /home/aicrowd/train.py "$@"
+
+%startscript
+    exec /bin/bash xvfb-run python3 /home/aicrowd/train.py "$@"
