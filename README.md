@@ -3,7 +3,9 @@
 1. Create an .env file in project's root folder and add:
 
 ```shell
-CONTAINER_NAME=kabasalt # You can change the name if you have multiple containers...
+CONTAINER_NAME=kabasalt_container # add your lastname to make it unique
+IMAGE_NAME=kabasalt # add your lastname to make it unique
+PORT=9998 
 ```
 
 2. Build container and start docker container 
