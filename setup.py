@@ -4,10 +4,10 @@ import os
 import setuptools
 
 # Package meta-data.
-NAME = "basalt2022"
+NAME = "kabasalt2022"
 DESCRIPTION = "Solution for Basalt 2022'"
 LONG_DESCRIPTION_CONTENT_TYPE = "text/markdown"
-URL = "https://github.com/lauritowal/BASALT_2022.git"
+URL = "https://github.com/BASALT-2022-Karlsruhe/ka-basalt-2022.git"
 EMAIL = ""
 AUTHOR = ""
 REQUIRES_PYTHON = ">=3.8.5"
