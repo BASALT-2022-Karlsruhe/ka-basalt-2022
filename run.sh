@@ -7,7 +7,7 @@ export $(cat .env | xargs)
 mkdir -p data
 
 # generate requirements.txt
-pip-compile setup.py
+# pip-compile setup.py
 
 # build and run container
 docker-compose up --build -d
