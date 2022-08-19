@@ -1,7 +1,13 @@
 services:
   kabasalt:
-    image: kabasalt
+    image: ${IMAGE_NAME}
     container_name: ${CONTAINER_NAME}
+
+    # for interactive mode e.g. for entrypoint /bin/shell
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+
+    entrypoint: "/bin/bash"
 
     # Specifying an init process ensures the usual responsibilities of an init system,
     # such as reaping zombie processes, are performed inside the created container.
@@ -12,9 +18,8 @@ services:
       PYTHONUNBUFFERED: 1
     build:
       context: .
-    entrypoint: /bin/bash
     ports:
-      - 9999:9999
+      - ${PORT}:9999
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
