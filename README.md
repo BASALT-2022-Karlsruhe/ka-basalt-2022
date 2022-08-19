@@ -10,7 +10,7 @@
 ```shell
 CONTAINER_NAME=kabasalt_container # add your lastname to make it unique
 IMAGE_NAME=kabasalt # add your lastname to make it unique
-PORT=9998 
+PORT=9898
 ```
 
 2. Build container and start docker container 
