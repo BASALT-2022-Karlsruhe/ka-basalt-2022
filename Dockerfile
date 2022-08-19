@@ -6,9 +6,6 @@
 # This is done to save time during the submissions and faster debugging for you.
 FROM aicrowd/base-images:minerl-22-base
 
-# ---------------------------------------------
-# Project-specific System Dependencies
-# ---------------------------------------------
 # Install needed apt packages
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
