@@ -23,4 +23,4 @@ sh run.sh
 ## Logs
 You can view the outputs of the container by doing:
 ```shell
-docker logs -f kabasalt
+docker logs -f ka-basalt-2022
