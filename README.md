@@ -1,8 +1,8 @@
 # Getting started
 
 0. Clone https://github.com/BASALT-2022-Karlsruhe/ka-basalt-2022-datadownloader somewhere *outside* of this project
-   1. git clone git@github.com:BASALT-2022-Karlsruhe/ka-basalt-2022-datadownloader.git
-   2. `cd ka-basalt-2022-datadownloader
+   1. `git clone git@github.com:BASALT-2022-Karlsruhe/ka-basalt-2022-datadownloader.git`
+   2. `cd ka-basalt-2022-datadownloader`
    3. `run.sh` --> You should end up with a volume containing the downloaded demonstration data 
 1. Move back to this project: ka-basalt-2022
 2. Create an .env file in project's root folder and add:
