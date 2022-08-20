@@ -24,7 +24,13 @@ services:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
         target: /home/aicrowd/data/
-
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0'] # specify the device ids of the GPUs on your system, which will be used for training
+              capabilities: [ gpu ]
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
