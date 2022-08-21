@@ -29,6 +29,3 @@ RUN conda env update --name minerl -f environment.yml --prune
 
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
-
-# starts train.py in headless mode on default, Specify entripoint in docker-compose.yaml if you want to override default
-CMD ["xvfb-run", "python3", "/home/aicrowd/train.py"]
