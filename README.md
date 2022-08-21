@@ -23,10 +23,11 @@ sh run.sh
 ```
 3. This starts `bin/bash` on the container . From here you can now start e.g. `train.py` to train your agent
 
-4. To be able to specify different GPUs for e.g. train.py:
+4. To be able to specify different GPUs for e.g. train.py, add the following deploy part under kabasalt: to your docker-compose.override.yaml
 ```yaml
 services:
   kabasalt:
+    ...
     deploy:
       resources:
         reservations:
