@@ -1,7 +1,7 @@
 services:
   kabasalt:
-    image: ${IMAGE_NAME}
-    container_name: ${CONTAINER_NAME}
+    image: kabasalt_laurito
+    container_name: basalt_container_laurito
 
     # for interactive mode e.g. for entrypoint /bin/shell
     stdin_open: true # docker run -i
@@ -19,7 +19,7 @@ services:
     build:
       context: .
     ports:
-      - ${PORT}:9999
+      - 9898:9999
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
