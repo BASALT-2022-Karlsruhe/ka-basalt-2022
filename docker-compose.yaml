@@ -24,13 +24,27 @@ services:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
         target: /home/aicrowd/data/
+      - type: volume
+        source: models
+        target: /home/aicrowd/train
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
-              capabilities: [ gpu ]
+              capabilities: [ gpu ]  models:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/train
+      o: bind
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
+  models:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/train
+      o: bind
