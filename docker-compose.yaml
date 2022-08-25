@@ -1,7 +1,7 @@
 services:
   kabasalt:
-    image: kabasalt_laurito
-    container_name: basalt_container_laurito
+    image: kabasalt_${NAME}
+    container_name: basalt_container_${NAME}
 
     # for interactive mode e.g. for entrypoint /bin/shell
     stdin_open: true # docker run -i
@@ -19,7 +19,7 @@ services:
     build:
       context: .
     ports:
-      - 9898:9999
+      - ${PORT}:9999
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_data
@@ -33,12 +33,7 @@ services:
           devices:
             - driver: nvidia
               device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
-              capabilities: [ gpu ]  models:
-    driver: local
-    driver_opts:
-      type: none
-      device: $PWD/train
-      o: bind
+              capabilities: [ gpu ]  
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
@@ -46,5 +41,5 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: $PWD/train
+      device: /home/shared/${NAME}_${VERSION}
       o: bind
