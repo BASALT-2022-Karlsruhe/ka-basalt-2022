@@ -14,8 +14,8 @@ services:
     # https://docs.docker.com/engine/reference/run/#specify-an-init-process
     init: true
 
-    environment:
-      PYTHONUNBUFFERED: 1
+    env_file:
+      - .env
     build:
       context: .
     ports:
@@ -41,5 +41,5 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: /home/shared/${NAME}_${VERSION}
+      device: ${MODELS_ROOT}/${NAME}_${VERSION}
       o: bind
