@@ -1,5 +1,9 @@
 docker-compose.override.yaml
-train
+.*/
+.bash*
+.profile
+.gitconfig
+Dockerfile-full
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

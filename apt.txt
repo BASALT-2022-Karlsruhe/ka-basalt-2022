@@ -1,5 +1,6 @@
 curl
 git
+git-lfs
 vim
 ssh
 gcc

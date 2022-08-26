@@ -26,3 +26,18 @@ For example to a shared folder, where all on your server have access to:
 ```shell
 docker exec -it --user root $basalt_container_${NAME} /bin/bash
 ```
+
+# Submitting Results 
+[Official Tutorial https://github.com/minerllabs/basalt_2022_competition_submission_template/blob/main/README.md]
+
+1. Go to https://gitlab.aicrowd.com/, navigate to "Preferences" -> "SSH Keys" and add an ssh-key to your profile. 
+2. Create a private repo. 
+3. Add it as a remote via `git remote add aicrowd git@gitlab.aicrowd.com:<user>/<repo>.git`. 
+4. Modify the `aicrowd.json` file. Use `"debug": true` when testing the submission process.
+5. Open bash in the docker container. 
+6. Before committing, make sure that the model-weights (and other large files you want to push) are marked with `Git LFS objects to be committed` when calling `git lfs status`. If not, run `git lfs track *.weights`. 
+7. Commit. 
+8. Push the branch you want to submit via `git push aicrowd <branch>` 
+9. Create a git tag with `git tag -am "submission-<version>" submission-<version>`
+10. Push the tag with `git push aicrowd submission-<version>`
+11. Check the status of your submission in the issues section of the repository.
