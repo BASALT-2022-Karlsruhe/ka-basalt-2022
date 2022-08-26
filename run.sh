@@ -4,5 +4,9 @@
 mkdir -p data
 mkdir -p train
 
+[ ! -f .env ] || export $(sed 's/#.*//g' .env | xargs)
+
+sudo mkdir ${MODELS_ROOT}${NAME}_${VERSION}
+
 # build and run container
 docker-compose up --build -d
