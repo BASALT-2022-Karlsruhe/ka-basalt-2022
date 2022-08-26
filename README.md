@@ -24,5 +24,5 @@ For example to a shared folder, where all on your server have access to:
 
 # start bash on container
 ```shell
-docker exec -it --user root $basalt_container_${NAME} /bin/bash
+docker exec -it --user root basalt_container_${NAME}_${GOAL} /bin/bash
 ```
