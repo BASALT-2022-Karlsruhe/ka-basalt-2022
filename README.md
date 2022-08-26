@@ -13,7 +13,7 @@ For example to a shared folder, where all on your server have access to:
 3. Create an `.env` file and adjust the parameters
    1. `NAME=<NAME>_<Goal>` # e.g. kulbach_baseline 
    2. `VERSION='0_0_1'` # Version of your experiments
-   3. `MODELS_ROOT='/home/shared/'` # Folder where you expect and save your models.
+   3. `MODELS_ROOT='/home/shared/BASALT/models'` # Folder where you expect and save your models.
    4. `PORT=9898`
    5. `PYTHONUNBUFFERED=1`
 4. Build container and start docker container
