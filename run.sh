@@ -10,4 +10,4 @@ echo "Please insert password!"
 sudo mkdir -p ${MODELS_ROOT}${NAME}_${VERSION}
 
 # build and run container
-docker-compose up --build -d
+docker-compose up -d
