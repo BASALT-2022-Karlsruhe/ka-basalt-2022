@@ -5,9 +5,7 @@ mkdir -p data
 mkdir -p train
 
 [ ! -f .env ] || export $(sed 's/#.*//g' .env | xargs)
-
-echo "Please insert password!"
-sudo mkdir -p ${MODELS_ROOT}${NAME}_${VERSION}
+mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION} # please make sure to create in a folder with access rights
 
 # build and run container
 docker-compose up -d
