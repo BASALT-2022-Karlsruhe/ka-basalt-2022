@@ -1,7 +1,7 @@
 services:
   kabasalt:
-    image: kabasalt_${NAME}
-    container_name: basalt_container_${NAME}
+    image: kabasalt_image_${NAME}
+    container_name: kabasalt_container_${NAME}
 
     # for interactive mode e.g. for entrypoint /bin/shell
     stdin_open: true # docker run -i
