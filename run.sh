@@ -8,4 +8,4 @@ mkdir -p train
 mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION} # please make sure to create in a folder with access rights
 
 # build and run container
-docker-compose up -d
+docker-compose up --build -d
