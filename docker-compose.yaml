@@ -3,7 +3,7 @@ services:
     image: kabasalt_image_${NAME}
     container_name: kabasalt_container_${NAME}
 
-    # for interactive mode e.g. for entrypoint /bin/shell
+    # for interactive mode e.g. for entrypoint /bin/bash
     stdin_open: true # docker run -i
     tty: true        # docker run -t
 
