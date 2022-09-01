@@ -7,5 +7,9 @@ def main():
         weights="train/MineRLBasaltFindCave.weights",
         env="MineRLBasaltFindCave-v0",
         n_episodes=EVAL_EPISODES,
-        max_steps=EVAL_MAX_STEPS
+        max_steps=EVAL_MAX_STEPS,
+        record=True,
     )
+
+if __name__ == '__main__':
+    main()
