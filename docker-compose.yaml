@@ -35,6 +35,7 @@ volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
   models:
+    name: ka-basalt-2022-models-${NAME}-${VERSION}
     driver: local
     driver_opts:
       type: none
