@@ -27,6 +27,13 @@ For example to a shared folder, where all on your server have access to:
 docker exec -it --user root basalt_container_${NAME}_${GOAL} /bin/bash
 ```
 
+# Start Training process directly + inpect logs of container
+In your docker-compose .yaml (or docker-compose.override.yaml), if you change entrypoint to:
+
+`entrypoint: "python train.py"` 
+
+and just start run.sh, then it will start the training process directly and you should be able to see the output via `docker logs -f CONAINER_NAME`
+
 # Submitting Results 
 [Official Tutorial https://github.com/minerllabs/basalt_2022_competition_submission_template/blob/main/README.md]
 
