@@ -9,3 +9,6 @@ def main():
         n_episodes=EVAL_EPISODES,
         max_steps=EVAL_MAX_STEPS
     )
+
+if __name__ == '__main__':
+    main()
