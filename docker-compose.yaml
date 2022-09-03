@@ -1,42 +1,43 @@
-services:
-  kabasalt:
-    image: kabasalt_image_${NAME}
-    container_name: kabasalt_container_${NAME}
+  services:
+    kabasalt:
+      image: kabasalt_image_${NAME}
+      container_name: kabasalt_container_${NAME}
 
-    # for interactive mode e.g. for entrypoint /bin/bash
-    stdin_open: true # docker run -i
-    tty: true        # docker run -t
+      # for interactive mode e.g. for entrypoint /bin/bash
+      stdin_open: true # docker run -i
+      tty: true        # docker run -t
 
-    entrypoint: "/bin/bash"
+      entrypoint: "/bin/bash"
 
-    init: true
+      init: true
 
-    env_file:
-      - .env
-    build:
-      context: .
-    ports:
-      - ${PORT}:9999
-    volumes:
-      - type: volume
-        source: ka-basalt-2022-datadownloader_data
-        target: /home/aicrowd/data/
-      - type: volume
-        source: models
-        target: /home/aicrowd/train
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
-              capabilities: [ gpu ]  
-volumes:
-  ka-basalt-2022-datadownloader_data:
-    external: true
-  models:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${MODELS_ROOT}/${NAME}_${VERSION}
-      o: bind
+      env_file:
+        - .env
+      build:
+        context: .
+      ports:
+        - ${PORT}:9999
+      volumes:
+        - type: volume
+          source: ka-basalt-2022-datadownloader_data
+          target: /home/aicrowd/data/
+        - type: volume
+          source: models
+          target: /home/aicrowd/train
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
+                capabilities: [ gpu ]  
+  volumes:
+    ka-basalt-2022-datadownloader_data:
+      external: true
+    models:
+      name: ka-basalt-2022-models-${NAME}-${VERSION}
+      driver: local
+      driver_opts:
+        type: none
+        device: ${MODELS_ROOT}/${NAME}_${VERSION}
+        o: bind
