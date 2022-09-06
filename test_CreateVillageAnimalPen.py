@@ -10,7 +10,7 @@ def main():
         env="MineRLBasaltCreateVillageAnimalPen-v0",
         n_episodes=EVAL_EPISODES,
         max_steps=EVAL_MAX_STEPS,
-        video_dir=str(video_dir)
+        video_dir=str(video_dir.absolute())
     )
 
 if __name__ == '__main__':
