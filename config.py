@@ -17,5 +17,5 @@ if settings.get('debug', False):
     # if debug flag is set to true, evaluation will only run a single episode for 100 steps.
     # Again, this will be enforced by the evaluation server, and do not do more episodes/steps
     # than this
-    EVAL_EPISODES = int(os.getenv("AICROWD_NUM_EVAL_EPISODES", 1))
-    EVAL_MAX_STEPS = int(os.getenv("AICROWD_NUM_EVAL_MAX_STEPS", 10))
+    EVAL_EPISODES = int(os.getenv("AICROWD_NUM_EVAL_EPISODES", 10))
+    EVAL_MAX_STEPS = int(os.getenv("AICROWD_NUM_EVAL_MAX_STEPS", 1000))
