@@ -4,11 +4,9 @@ channels:
   - defaults
   - pytorch
 dependencies:
-  - python=3.7
+  - python=3.8
   - pip
   - py-opencv
-  - cudatoolkit=10.2
-  - pytorch=1.9.0
   - pip:
     - git+https://github.com/minerllabs/minerl
     - coloredlogs
@@ -17,3 +15,7 @@ dependencies:
     - aicrowd-gym
     - gym3
     - attrs
+    - --extra-index-url https://download.pytorch.org/whl/cu113
+    - torch==1.12.1+cu113
+    - torchvision
+    - torchaudio
