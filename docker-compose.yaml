@@ -15,6 +15,8 @@ services:
       - .env
     build:
       context: .
+      args:
+        progress: plain
     ports:
       - ${PORT}:9999
     volumes:
@@ -30,7 +32,7 @@ services:
           devices:
             - driver: nvidia
               device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
-              capabilities: [ gpu ]  
+              capabilities: [ gpu ]
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
