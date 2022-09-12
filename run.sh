@@ -6,6 +6,8 @@ mkdir -p train
 
 [ ! -f .env ] || export $(sed 's/#.*//g' .env | xargs)
 mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION} # please make sure to create in a folder with access rights
+mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION}/videos # please make sure to create in a folder with access rights
+mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION}/report # please make sure to create in a folder with access rights
 
 # build and run container
 docker-compose up --build -d
