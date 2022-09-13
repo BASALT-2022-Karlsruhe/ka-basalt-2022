@@ -48,3 +48,20 @@ and just start run.sh, then it will start the training process directly and you 
 9. Create a git tag with `git tag -am "submission-<version>" submission-<version>`
 10. Push the tag with `git push aicrowd submission-<version>`
 11. Check the status of your submission in the issues section of the repository.
+
+# Testing code on Debian without Docker
+
+```shell
+# Install dependency packages
+sudo apt -qq update && xargs -a apt.txt apt -qq install -y --no-install-recommends \
+ && rm -rf /var/cache/*
+
+# Create conda environment
+conda env create -n basalt -f environment.yml --prune
+
+# Activate environment
+conda activate basalt
+
+# Test whether your code works
+python <your-script>.py 
+```
