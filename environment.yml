@@ -9,8 +9,10 @@ dependencies:
   - py-opencv
   - pip:
     - git+https://github.com/minerllabs/minerl
-    - coloredlogs
+    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git
+    - werkzeug==2.1
     - matplotlib
+    - coloredlogs
     - aicrowd-api
     - aicrowd-gym
     - gym3
