@@ -9,3 +9,4 @@ mkdir -p ${MODELS_ROOT}/${NAME}_${VERSION} # please make sure to create in a fol
 
 # build and run container
 docker-compose up --build -d
+
