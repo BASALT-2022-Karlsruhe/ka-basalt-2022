@@ -19,13 +19,14 @@ ENV HOME_DIR /home/$USER
 ENV CONDA_DEFAULT_ENV="minerl"
 ENV PATH /home/aicrowd/.conda/envs/minerl/bin:$PATH
 ENV FORCE_CUDA="1"
+ENV GIT_ACCESS_TOKEN="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"
 
 # Use MineRL environment
 SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
 
 # Conda environment update
 COPY environment.yml environment.yml
-RUN conda update -n base -c defaults conda
+RUN conda env update --name minerl -f environment.yml --prune
 
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
