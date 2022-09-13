@@ -25,7 +25,7 @@ SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
 
 # Conda environment update
 COPY environment.yml environment.yml
-RUN conda env update --name minerl -f environment.yml --prune
+RUN conda update -n base -c defaults conda
 
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
