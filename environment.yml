@@ -4,17 +4,17 @@ channels:
   - defaults
   - pytorch
 dependencies:
-  - python=3.9
+  - python=3.8
   - pip
   - py-opencv
   - cudatoolkit=10.2
   - pytorch=1.9.0
   - pip:
     - git+https://github.com/minerllabs/minerl
+    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git
+    - werkzeug==2.1
     - coloredlogs
-    - matplotlib
     - aicrowd-api
     - aicrowd-gym
     - gym3
     - attrs
-    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git
