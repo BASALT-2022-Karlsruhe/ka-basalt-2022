@@ -18,4 +18,4 @@ dependencies:
     - --extra-index-url https://download.pytorch.org/whl/cu113
     - torch==1.12.1+cu113
     - werkzeug==2.1
-    - git+https://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@github.com/BASALT-2022-Karlsruhe/imitation.git
+    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git
