@@ -1,16 +1,14 @@
 name: minerl
 channels:
-  - pytorch
   - conda-forge
   - defaults
+  - pytorch
 dependencies:
   - python=3.8
   - pip
   - py-opencv
   - pip:
     - git+https://github.com/minerllabs/minerl
-    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git
-    - werkzeug==2.1
     - matplotlib
     - coloredlogs
     - aicrowd-api
@@ -19,3 +17,5 @@ dependencies:
     - attrs
     - --extra-index-url https://download.pytorch.org/whl/cu113
     - torch==1.12.1+cu113
+    - werkzeug==2.1
+    - git+https://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@github.com/BASALT-2022-Karlsruhe/imitation.git
