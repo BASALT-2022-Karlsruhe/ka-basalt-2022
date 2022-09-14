@@ -16,7 +16,7 @@ services:
     build:
       context: .
       args:
-        progress: plain
+        git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
     volumes:

@@ -20,6 +20,9 @@ ENV CONDA_DEFAULT_ENV="minerl"
 ENV PATH /home/aicrowd/.conda/envs/minerl/bin:$PATH
 ENV FORCE_CUDA="1"
 
+ARG git_access_token
+ENV GIT_ACCESS_TOKEN $git_access_token
+
 # Use MineRL environment
 SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
 
