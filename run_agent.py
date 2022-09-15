@@ -8,7 +8,7 @@ from gym.wrappers import Monitor
 
 from openai_vpt.agent import MineRLAgent
 
-def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=False, record=False, video_dir="./video"):
+def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True, record=True, video_dir="./video"):
     # Using aicrowd_gym is important! Your submission will not work otherwise
     env = aicrowd_gym.make(env)
 
