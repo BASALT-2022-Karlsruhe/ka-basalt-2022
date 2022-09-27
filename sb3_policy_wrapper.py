@@ -186,23 +186,32 @@ class HierarchicalDistribution(Distribution):
 
 
 if __name__ == "__main__":
+    import pickle
     from stable_baselines3 import PPO
     import minerl
+
+    def load_model_parameters(path_to_model_file):
+        agent_parameters = pickle.load(open(path_to_model_file, "rb"))
+        policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
+        pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
+        pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
+        return policy_kwargs, pi_head_kwargs
 
     # Setup environment
     env = gym.make("MineRLBasaltFindCave-v0")
 
     # Setup agent
-    in_model = "data/VPT-models/foundation-model-1x.model",
-    in_weights = "data/VPT-models/foundation-model-1x.weights",
+    in_model = "data/VPT-models/foundation-model-1x.model"
+    in_weights = "data/VPT-models/foundation-model-1x.weights"
+    agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
-    agent = MineRLAgent(
+    minerl_agent = MineRLAgent(
         env,
         device="cpu",
-        policy_kwargs=POLICY_KWARGS,
-        pi_head_kwargs=PI_HEAD_KWARGS
+        policy_kwargs=agent_policy_kwargs,
+        pi_head_kwargs=agent_pi_head_kwargs
     )
-    agent.load_weights(in_weights)
+    minerl_agent.load_weights(in_weights)
 
     # Setup PPO
     model = PPO(
