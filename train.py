@@ -8,6 +8,8 @@ def pretraining():
     executed before training # Add things you want to execute
     """
     create_subfolders.main()
+    Logging.setup()
+
     Logging.info('Start training')
 
 def posttraining():
