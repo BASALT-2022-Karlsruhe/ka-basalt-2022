@@ -36,6 +36,10 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             pi_head_kwargs,
             **kwargs):
 
+        self.minerl_agent = minerl_agent
+        self.minerl_policy_kwargs = policy_kwargs
+        self.minerl_pi_head_kwargs = pi_head_kwargs
+
         # TODO check compatibility of MineRL observation_space
         super(MinecraftActorCriticPolicy, self).__init__(
             observation_space,
@@ -44,16 +48,12 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             **kwargs
         )
 
-        self.minerl_agent = minerl_agent
-        self.minerl_policy_kwargs = policy_kwargs
-        self.minerl_pi_head_kwargs
-
         self.ortho_init = False
 
         # TODO Action distribution -> this needs to be implement using the DictActionHead
         # self.action_dist = HierarchicalDistribution(...)
 
-    def forward(self, obs: th.Tensor, first: th.Tensor, state_in, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def forward(self, observation: Tuple, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
 
@@ -64,6 +64,7 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :return: action, value and log probability of the action
         """
         # TODO it seems like SB3 requires compatibility with batches of observations, MineRL does not have that as far as I can tell.. or does it?
+        obs, first, state_in = observation
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
             obs, first, state_in)
         action = self.minerl_agent.policy.pi_head.sample(
@@ -190,6 +191,8 @@ if __name__ == "__main__":
     from stable_baselines3 import PPO
     import minerl
 
+    from gym_wrappers import RewardModelWrapper, DictToBoxActionSpace
+
     def load_model_parameters(path_to_model_file):
         agent_parameters = pickle.load(open(path_to_model_file, "rb"))
         policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
@@ -213,6 +216,9 @@ if __name__ == "__main__":
     )
     minerl_agent.load_weights(in_weights)
 
+    # Make env compatible with SB3
+    wrapped_env = DictToBoxActionSpace(env, minerl_agent.action_transformer, minerl_agent.action_mapper)
+
     # Setup PPO
     model = PPO(
         policy=MinecraftActorCriticPolicy,
@@ -221,7 +227,7 @@ if __name__ == "__main__":
             "policy_kwargs": POLICY_KWARGS,
             "pi_head_kwargs": PI_HEAD_KWARGS
         },
-        env=env,
+        env=wrapped_env,
         seed=0,
         n_steps=100,
         batch_size=10,
