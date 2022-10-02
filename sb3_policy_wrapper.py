@@ -64,14 +64,22 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :return: action, value and log probability of the action
         """
         # TODO it seems like SB3 requires compatibility with batches of observations, MineRL does not have that as far as I can tell.. or does it?
-        obs, first, state_in = observation
+        obs, first, state_in = self.minerl_agent.unpack_dict_obs(observation)
+
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
             obs, first, state_in)
+            
         action = self.minerl_agent.policy.pi_head.sample(
             pi_logits, deterministic=deterministic)
+
         value = self.minerl_agent.policy.value_head.denormalize(vpred)[:, 0]
-        log_prob = self.minerl_agent.policy.pi_head.log_prob(action, pi_logits)
-        return action, value, log_prob
+        log_prob = self.minerl_agent.policy.pi_head.logprob(action, pi_logits)
+
+        # convert dict action into Tensor so it can pass through the SB3 functions
+        #numpy_dict_action = {k: v.numpy().flatten() for k, v in action.items()}
+        #minerl_action = self.minerl_agent._agent_action_to_env(action)#action_transformer.dict_to_numpy(numpy_dict_action)
+        tensor_action = th.cat((action["buttons"], action["camera"]), dim=-1)
+        return tensor_action, value, log_prob
 
     # TODO do we need to modify this?
     def reset_noise(self, n_envs: int = 1) -> None:
@@ -84,7 +92,6 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             self.action_dist, StateDependentNoiseDistribution), "reset_noise() is only available when using gSDE"
         self.action_dist.sample_weights(self.log_std, batch_size=n_envs)
 
-    # TODO here they construct action_net and value_net for the output
     def _build(self, lr_schedule: Schedule) -> None:
         """
         Create the networks and the optimizer.
@@ -171,6 +178,9 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :param obs:
         :return: the estimated values.
         """
+
+        obs, first, state_in = self.minerl_agent.unpack_dict_obs(observation)
+
         (_, latent_vf), state_out = self.minerl_agent.policy.net(obs, first, state_in)
         return self.value_net(latent_vf)
 
@@ -191,7 +201,7 @@ if __name__ == "__main__":
     from stable_baselines3 import PPO
     import minerl
 
-    from gym_wrappers import RewardModelWrapper, DictToBoxActionSpace
+    from gym_wrappers import RewardModelWrapper, DictToBoxActionSpace, HiddenStateObservationSpace
 
     def load_model_parameters(path_to_model_file):
         agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -217,7 +227,8 @@ if __name__ == "__main__":
     minerl_agent.load_weights(in_weights)
 
     # Make env compatible with SB3
-    wrapped_env = DictToBoxActionSpace(env, minerl_agent.action_transformer, minerl_agent.action_mapper)
+    wrapped_env = DictToBoxActionSpace(env, minerl_agent)
+    wrapped_env = HiddenStateObservationSpace(wrapped_env, minerl_agent)
 
     # Setup PPO
     model = PPO(

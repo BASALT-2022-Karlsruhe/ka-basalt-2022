@@ -186,3 +186,15 @@ class MineRLAgent:
         )
         minerl_action = self._agent_action_to_env(agent_action)
         return minerl_action
+    
+    def unpack_dict_obs(self, obs):
+        img_obs = {"img": obs["img"]}
+        first_obs = obs["first"].bool()
+        state_in_obs = []
+        for i in range(len(self.hidden_state)):
+            state_in1 = obs["state_in1"][:, i, :, :]
+            if th.isnan(state_in1).all():
+                state_in1 = None
+            state_in_tuple = (state_in1, (obs["state_in2"][:, i, :, :], obs["state_in3"][:, i, :, :]))
+            state_in_obs.append(state_in_tuple)
+        return img_obs, first_obs, state_in_obs
