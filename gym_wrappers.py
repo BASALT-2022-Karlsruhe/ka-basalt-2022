@@ -1,7 +1,5 @@
-from collections import OrderedDict
-
 import gym
-from gym.spaces import Tuple, Box, Dict, Discrete, MultiDiscrete
+from gym.spaces import Box, Dict, MultiDiscrete
 import numpy as np
 import torch as th
 
