@@ -11,36 +11,24 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.distributions import Distribution
-from openai_vpt.agent import POLICY_KWARGS, PI_HEAD_KWARGS, MineRLAgent
-
-
-def make_SB3_policy_wrapper(env: gym.Env, minerl_agent: MineRLAgent, lr: Union[float, int]):
-    sb3_ac_policy = MinecraftActorCriticPolicy(
-        env.observation_space,
-        env.action_space,
-        lr,
-        minerl_agent,
-        POLICY_KWARGS,
-        PI_HEAD_KWARGS)
-    return sb3_ac_policy
+from openai_vpt.agent import MineRLAgent
 
 
 class MinecraftActorCriticPolicy(ActorCriticPolicy):
     def __init__(
             self,
-            observation_space,
-            action_space,
-            lr_schedule,
-            minerl_agent,
-            policy_kwargs,
-            pi_head_kwargs,
+            observation_space: gym.spaces.Space,
+            action_space: gym.spaces.Space,
+            lr_schedule: Schedule,
+            minerl_agent: MineRLAgent,
+            policy_kwargs: Dict,
+            pi_head_kwargs: Dict,
             **kwargs):
 
         self.minerl_agent = minerl_agent
         self.minerl_policy_kwargs = policy_kwargs
         self.minerl_pi_head_kwargs = pi_head_kwargs
 
-        # TODO check compatibility of MineRL observation_space
         super(MinecraftActorCriticPolicy, self).__init__(
             observation_space,
             action_space,
@@ -50,47 +38,34 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
 
         self.ortho_init = False
 
-        # TODO Action distribution -> this needs to be implement using the DictActionHead
-        # self.action_dist = HierarchicalDistribution(...)
-
     def forward(self, observation: Tuple, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
 
         :param obs: Observation
-        :param first: the initial hidden state
-        :param state_in: list of intermediate hidden states of previous inference
         :param deterministic: Whether to sample or use deterministic actions
         :return: action, value and log probability of the action
         """
-        # TODO it seems like SB3 requires compatibility with batches of observations, MineRL does not have that as far as I can tell.. or does it?
+
+        # TODO it seems like SB3 requires compatibility with batches of observations, does MineRLAgent support batches?
+        # unpack observation
         obs, first, state_in = self.minerl_agent.unpack_dict_obs(observation)
 
+        # inference
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
             obs, first, state_in)
-            
-        action = self.minerl_agent.policy.pi_head.sample(
+
+        # action sampling
+        action = self.action_net.sample(
             pi_logits, deterministic=deterministic)
 
-        value = self.minerl_agent.policy.value_head.denormalize(vpred)[:, 0]
-        log_prob = self.minerl_agent.policy.pi_head.logprob(action, pi_logits)
+        value = self.value_net.denormalize(vpred)[:, 0]
+        log_prob = self.action_net.logprob(action, pi_logits)
 
-        # convert dict action into Tensor so it can pass through the SB3 functions
-        #numpy_dict_action = {k: v.numpy().flatten() for k, v in action.items()}
-        #minerl_action = self.minerl_agent._agent_action_to_env(action)#action_transformer.dict_to_numpy(numpy_dict_action)
-        tensor_action = th.cat((action["buttons"], action["camera"]), dim=-1)
-        return tensor_action, value, log_prob
+        # convert agent action into array so it can pass through the SB3 functions
+        array_action = th.cat((action["camera"], action["buttons"]), dim=-1)
 
-    # TODO do we need to modify this?
-    def reset_noise(self, n_envs: int = 1) -> None:
-        """
-        Sample new weights for the exploration matrix.
-
-        :param n_envs:
-        """
-        assert isinstance(
-            self.action_dist, StateDependentNoiseDistribution), "reset_noise() is only available when using gSDE"
-        self.action_dist.sample_weights(self.log_std, batch_size=n_envs)
+        return array_action, value, log_prob
 
     def _build(self, lr_schedule: Schedule) -> None:
         """
@@ -100,32 +75,17 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             lr_schedule(1) is the initial learning rate
         """
 
-        latent_dim_pi = self.minerl_agent.policy.net.hidsize
+        #latent_dim_pi = self.minerl_agent.policy.net.hidsize
 
-        # TODO is the output of action_net an action or a probability distribution?
+        # Setup action and value heads
         self.action_net = self.minerl_agent.policy.pi_head
-
         self.value_net = self.minerl_agent.policy.value_head
 
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(
             self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
-    # TODO the following functions compatible with our action head
-    def _get_action_dist_from_latent(self, latent_pi: th.Tensor) -> Distribution:
-        """
-        Retrieve action distribution given the latent codes.
-
-        :param latent_pi: Latent code for the actor
-        :return: Action distribution
-        """
-        mean_actions = self.action_net(latent_pi)
-        if isinstance(self.action_dist, HierarchicalDistribution):
-            return self.action_dist.proba_distribution(mean_actions)
-        else:
-            raise ValueError(("Invalid distribution!"))
-
-    def _predict(self, observation: th.Tensor, first, state_in, deterministic: bool = False) -> th.Tensor:
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         """
         Get the action according to the policy for a given observation.
 
@@ -133,14 +93,21 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :param deterministic: Whether to use stochastic or deterministic actions
         :return: Taken action according to the policy
         """
+
+        # unpack observation
+        img_obs, first, state_in = self.minerl_agent.unpack_dict_obs(obs)
+
+        # inference
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
-            observation, first, state_in)
-        action = self.minerl_agent.policy.pi_head.sample(
+            img_obs, first, state_in)
+
+        # action sampling
+        action = self.action_net.sample(
             pi_logits, deterministic=deterministic)
 
         return action
 
-    def evaluate_actions(self, obs: th.Tensor, first, state_in, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def evaluate_actions(self, obs: th.Tensor, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Evaluate actions according to the current policy,
         given the observations.
@@ -151,27 +118,23 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             and entropy of the action distribution.
         """
 
+        # convert array actions to agent actions
+        agent_actions = {"camera": actions[..., 0], "buttons": actions[..., 1]}
+
+        # unpack observation
+        img_obs, first, state_in = self.minerl_agent.unpack_dict_obs(obs)
+
+        # inference
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
-            obs, first, state_in)
-        action = self.minerl_agent.policy.pi_head.sample(
-            pi_logits, deterministic=deterministic)
-        value = self.minerl_agent.policy.value_head.denormalize(vpred)[:, 0]
-        log_prob = self.minerl_agent.policy.pi_head.log_prob(action, pi_logits)
-        return value, log_prob, self.minerl_agent.policy.pi_head.entropy(pi_logits)
+            img_obs, first, state_in)
 
-    def get_distribution(self, obs: th.Tensor, first, state_in) -> Distribution:
-        """
-        Get the current policy distribution given the observations.
+        value = self.value_net.denormalize(vpred)[:, 0]
+        log_prob = self.action_net.logprob(agent_actions, pi_logits)
+        entropy = self.action_net.entropy(pi_logits)
 
-        :param obs:
-        :return: the action distribution.
-        """
-        (latent_pi, latent_vf), state_out = self.minerl_agent.policy.net(
-            obs, first, state_in)
+        return value, log_prob, entropy
 
-        return self._get_action_dist_from_latent(latent_pi)
-
-    def predict_values(self, obs: th.Tensor, first, state_in) -> th.Tensor:
+    def predict_values(self, obs: th.Tensor) -> th.Tensor:
         """
         Get the estimated values according to the current policy given the observations.
 
@@ -179,29 +142,25 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :return: the estimated values.
         """
 
-        obs, first, state_in = self.minerl_agent.unpack_dict_obs(observation)
+        # unpack observation
+        img_obs, first, state_in = self.minerl_agent.unpack_dict_obs(obs)
 
-        (_, latent_vf), state_out = self.minerl_agent.policy.net(obs, first, state_in)
-        return self.value_net(latent_vf)
+        # inference
+        (_, latent_vf), state_out = self.minerl_agent.policy.net(
+            img_obs, state_in, {"first": first})
+        value = self.value_net(latent_vf)
 
-
-# TODO create custom Distribution wrapper for the hierarchical MineRL action space using the existing DictActionHead class
-class HierarchicalDistribution(Distribution):
-    def __init__(self, pi_head):
-        super().__init__()
-        #self.action_dims = ...
-
-    def proba_distribution_net(self, latent_dim):
-        # action_logits = ...
-        return action_logits
+        return value
 
 
 if __name__ == "__main__":
     import pickle
+
     from stable_baselines3 import PPO
     import minerl
 
-    from gym_wrappers import RewardModelWrapper, DictToBoxActionSpace, HiddenStateObservationSpace
+    from openai_vpt.agent import POLICY_KWARGS, PI_HEAD_KWARGS, MineRLAgent
+    from gym_wrappers import RewardModelWrapper, DictToMultiDiscreteActionSpace, HiddenStateObservationSpace
 
     def load_model_parameters(path_to_model_file):
         agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -227,8 +186,12 @@ if __name__ == "__main__":
     minerl_agent.load_weights(in_weights)
 
     # Make env compatible with SB3
-    wrapped_env = DictToBoxActionSpace(env, minerl_agent)
+    wrapped_env = DictToMultiDiscreteActionSpace(env, minerl_agent)
     wrapped_env = HiddenStateObservationSpace(wrapped_env, minerl_agent)
+    
+    # Augment MineRL env with reward model
+    wrapped_env = RewardModelWrapper(wrapped_env, lambda obs: 0., {
+                                     "action_dependent": False})
 
     # Setup PPO
     model = PPO(
@@ -247,5 +210,7 @@ if __name__ == "__main__":
         verbose=1)
 
     # Train
-    # TODO this assumes that env contains a reward function...
-    model.learn(10)
+    model.learn(1)
+
+    wrapped_env.close()
+    print("Finished")
