@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import gym
 import torch as th
@@ -19,25 +19,25 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
     """
 
     def __init__(
-            self,
-            observation_space: gym.spaces.Space,
-            action_space: gym.spaces.Space,
-            lr_schedule: Schedule,
-            minerl_agent: MineRLAgent,
-            **kwargs):
+        self,
+        observation_space: gym.spaces.Space,
+        action_space: gym.spaces.Space,
+        lr_schedule: Schedule,
+        minerl_agent: MineRLAgent,
+        **kwargs
+    ):
 
         self.minerl_agent = minerl_agent
 
         super(MinecraftActorCriticPolicy, self).__init__(
-            observation_space,
-            action_space,
-            lr_schedule,
-            **kwargs
+            observation_space, action_space, lr_schedule, **kwargs
         )
 
         self.ortho_init = False
 
-    def forward(self, observation: Dict[str, Tuple], deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def forward(
+        self, observation: Dict[str, th.Tensor], deterministic: bool = False
+    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
 
@@ -46,17 +46,16 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         :return: action, value and log probability of the action
         """
 
-        # TODO it seems like SB3 requires compatibility with batches of observations, does MineRLAgent support batches?
         # unpack observation
         obs, first, state_in = self.unpack_dict_obs(observation)
 
         # inference
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
-            obs, first, state_in)
+            obs, first, state_in
+        )
 
         # action sampling
-        action = self.action_net.sample(
-            pi_logits, deterministic=deterministic)
+        action = self.action_net.sample(pi_logits, deterministic=deterministic)
 
         value = self.value_net.denormalize(vpred)[:, 0]
         log_prob = self.action_net.logprob(action, pi_logits)
@@ -80,9 +79,12 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
 
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(
-            self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
+            self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs
+        )
 
-    def evaluate_actions(self, obs: Dict[str, th.Tensor], actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def evaluate_actions(
+        self, obs: Dict[str, th.Tensor], actions: th.Tensor
+    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Evaluate actions according to the current policy,
         given the observations.
@@ -101,7 +103,8 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
 
         # inference
         (pi_logits, vpred, _), state_out = self.minerl_agent.policy(
-            img_obs, first, state_in)
+            img_obs, first, state_in
+        )
 
         value = self.value_net.denormalize(vpred)[:, 0]
         log_prob = self.action_net.logprob(agent_actions, pi_logits)
@@ -113,7 +116,7 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         """
         Get the estimated values according to the current policy given the observations.
 
-        :param obs: 
+        :param obs:
         :return: the estimated values.
         """
 
@@ -122,17 +125,24 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
 
         # inference
         (_, latent_vf), state_out = self.minerl_agent.policy.net(
-            img_obs, state_in, {"first": first})
+            img_obs, state_in, {"first": first}
+        )
         value = self.value_net(latent_vf)
 
         return value
 
-    def unpack_dict_obs(self, obs: Dict[str, th.Tensor]) -> Tuple[Dict[str, th.Tensor], th.Tensor, List[Tuple[th.Tensor, Tuple[th.Tensor, th.Tensor]]]]:
+    def unpack_dict_obs(
+        self, obs: Dict[str, th.Tensor]
+    ) -> Tuple[
+        Dict[str, th.Tensor],
+        th.Tensor,
+        List[Tuple[th.Tensor, Tuple[th.Tensor, th.Tensor]]],
+    ]:
         """
-        Unpack the observation dictionary 
+        Unpack the observation dictionary
 
-        :param obs: 
-        :return: the agent image observation, the first input tensor and the hidden state tensors
+        :param obs:
+        :return: the agent image observation, first input tensor and the hidden state
         """
 
         img_obs = {"img": obs["img"]}
@@ -144,7 +154,9 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             if th.isnan(state_in1).all():
                 state_in1 = None
             state_in_tuple = (
-                state_in1, (obs["state_in2"][:, i, :, :], obs["state_in3"][:, i, :, :]))
+                state_in1,
+                (obs["state_in2"][:, i, :, :], obs["state_in3"][:, i, :, :]),
+            )
             state_in_obs.append(state_in_tuple)
 
         return img_obs, first_obs, state_in_obs
@@ -157,7 +169,11 @@ if __name__ == "__main__":
     import minerl
 
     from openai_vpt.agent import MineRLAgent
-    from gym_wrappers import RewardModelWrapper, DictToMultiDiscreteActionSpace, HiddenStateObservationSpace
+    from gym_wrappers import (
+        RewardModelWrapper,
+        DictToMultiDiscreteActionSpace,
+        HiddenStateObservationSpace,
+    )
 
     def load_model_parameters(path_to_model_file):
         agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -178,7 +194,7 @@ if __name__ == "__main__":
         env,
         device="cpu",  # "cuda" for GPU usage!
         policy_kwargs=agent_policy_kwargs,
-        pi_head_kwargs=agent_pi_head_kwargs
+        pi_head_kwargs=agent_pi_head_kwargs,
     )
     minerl_agent.load_weights(in_weights)
 
@@ -187,8 +203,9 @@ if __name__ == "__main__":
     wrapped_env = HiddenStateObservationSpace(wrapped_env, minerl_agent)
 
     # Augment MineRL env with reward model
-    wrapped_env = RewardModelWrapper(wrapped_env, lambda obs: 0., {
-                                     "action_dependent": False})
+    wrapped_env = RewardModelWrapper(
+        wrapped_env, lambda obs: 0.0, {"action_dependent": False}
+    )
 
     # Setup PPO
     model = PPO(
@@ -203,7 +220,8 @@ if __name__ == "__main__":
         batch_size=10,
         ent_coef=0.0,
         learning_rate=0.0003,
-        verbose=1)
+        verbose=1,
+    )
 
     # Train
     model.learn(1)

@@ -36,31 +36,34 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         env,
         device="cpu",  # "cuda" for GPU usage!
         policy_kwargs=agent_policy_kwargs,
-        pi_head_kwargs=agent_pi_head_kwargs
+        pi_head_kwargs=agent_pi_head_kwargs,
     )
     minerl_agent.load_weights(in_weights)
 
     # Setup MineRL VecEnv
-    venv = make_vec_env(minerl_env_str + "SB3-v0",
-                        env_make_kwargs={"minerl_agent": minerl_agent})
+    venv = make_vec_env(
+        minerl_env_str + "SB3-v0", env_make_kwargs={"minerl_agent": minerl_agent}
+    )
 
     # Setup preference-based reinforcement learning using the imitation package
-    # TODO In general, check whether algorithm hyperparameters make sense and tune them
+    # TODO In general, check whether algorithm hyperparams make sense and tune
 
-    # TODO use a suitable reward model architecture, e.g. reuse ImpalaCNN from the VPT models with a regression head
+    # TODO use a suitable reward model architecture,
+    # e.g. reuse ImpalaCNN from the VPT models with a regression head
     reward_net = BasicRewardNet(
         venv.observation_space, venv.action_space, normalize_input_layer=RunningNorm
     )
     preference_model = preference_comparisons.PreferenceModel(reward_net)
 
-    # TODO design more useful fragmenter for MineRL trajcetories, e.g. only compare last parts of episodes
-    fragmenter = preference_comparisons.RandomFragmenter(
-        warning_threshold=0, seed=0)
+    # TODO design more useful fragmenter for MineRL trajcetories,
+    # e.g. only compare last parts of episodes
+    fragmenter = preference_comparisons.RandomFragmenter(warning_threshold=0, seed=0)
 
     # TODO design gatherer that obtains preferences from web interface
     gatherer = preference_comparisons.SyntheticGatherer(seed=0)
 
-    # TODO imitation also provides EnsmbleTrainer (which requires an RewardEnsemble), which trainer should we use?
+    # TODO imitation also provides EnsembleTrainer
+    # (which requires a RewardEnsemble), which trainer should we use?
     reward_trainer = preference_comparisons.BasicRewardTrainer(
         model=reward_net,
         loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
@@ -122,15 +125,33 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--env", type=str,
-                        help="Environment name from [FindCave, MakeWaterfall, CreateVillageAnimalPen, BuildVillageHouse]", default="FindCave")
-    parser.add_argument("--in-model", type=str, help="Path to the .model file to be finetuned",
-                        default="data/VPT-models/foundation-model-1x.model")
-    parser.add_argument("--in-weights", type=str, help="Path to the .weights file to be finetuned",
-                        default="data/VPT-models/foundation-model-1x.weights")
-    parser.add_argument("--out-weights", type=str,
-                        help="Path where finetuned weights will be saved", default="train/PrefRLFinetuned.weights")
+    parser.add_argument(
+        "--env",
+        type=str,
+        help="Environment name from [FindCave, MakeWaterfall, \
+            CreateVillageAnimalPen, BuildVillageHouse]",
+        default="FindCave",
+    )
+    parser.add_argument(
+        "--in-model",
+        type=str,
+        help="Path to the .model file to be finetuned",
+        default="data/VPT-models/foundation-model-1x.model",
+    )
+    parser.add_argument(
+        "--in-weights",
+        type=str,
+        help="Path to the .weights file to be finetuned",
+        default="data/VPT-models/foundation-model-1x.weights",
+    )
+    parser.add_argument(
+        "--out-weights",
+        type=str,
+        help="Path where finetuned weights will be saved",
+        default="train/PrefRLFinetuned.weights",
+    )
 
     args = parser.parse_args()
-    preference_based_RL_train(args.env, args.in_model,
-                              args.in_weights, args.out_weights)
+    preference_based_RL_train(
+        args.env, args.in_model, args.in_weights, args.out_weights
+    )
