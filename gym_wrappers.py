@@ -36,11 +36,13 @@ class RewardModelWrapper(gym.Wrapper):
 class DictToMultiDiscreteActionSpace(gym.Wrapper):
     """Converts env with Dict action space into having a MultiDiscrete action space"""
 
-    def __init__(self, env, minerl_agent):
+    def __init__(self, env, minerl_agent=None):
         super().__init__(env)
 
         if not isinstance(self.env.action_space, Dict):
             raise ValueError("Original action space is not of type gym.Dict.")
+
+        assert minerl_agent is not None
 
         self.minerl_agent = minerl_agent
 
@@ -91,8 +93,10 @@ class DictToMultiDiscreteActionSpace(gym.Wrapper):
 class HiddenStateObservationSpace(gym.Wrapper):
     """Augments the observation space by the hidden state of the MineRLAgent"""
 
-    def __init__(self, env, minerl_agent):
+    def __init__(self, env, minerl_agent=None):
         super().__init__(env)
+
+        assert minerl_agent is not None
 
         self.minerl_agent = minerl_agent
 
