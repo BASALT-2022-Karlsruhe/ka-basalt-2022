@@ -7,7 +7,7 @@ services:
     stdin_open: true # docker run -i
     tty: true        # docker run -t
 
-    entrypoint: "/bin/bash"
+    entrypoint: "xvfb-run python run.py"
 
     init: true
 
@@ -15,11 +15,13 @@ services:
       - .env
     build:
       context: .
+      args:
+        git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
     volumes:
       - type: volume
-        source: ka-basalt-2022-datadownloader_data
+        source: ka-basalt-2022-datadownloader_${DATA_ROOT}
         target: /home/aicrowd/data/
       - type: volume
         source: models
@@ -33,6 +35,8 @@ services:
               capabilities: [ gpu ]  
 volumes:
   ka-basalt-2022-datadownloader_data:
+    external: true
+  ka-basalt-2022-datadownloader_data_wombat:
     external: true
   models:
     name: ka-basalt-2022-models-${NAME}-${VERSION}

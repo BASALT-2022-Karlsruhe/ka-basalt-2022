@@ -1,6 +1,8 @@
-# Train one model for each task
+from utils.logs import Logging
+from utils import create_subfolders
 from behavioural_cloning import behavioural_cloning_train
 from preference_based_RL import preference_based_RL_train
+
 
 FOUNDATION_MODEL = "foundation-model-1x"
 BC_TRAINING = True
@@ -9,7 +11,25 @@ ENVS = ["FindCave", "MakeWaterfall",
         "CreateVillageAnimalPen", "BuildVillageHouse"]
 
 
+def pretraining():
+    """
+    executed before training # Add things you want to execute
+    """
+    create_subfolders.main()
+    Logging.setup()
+
+    Logging.info('Start training')
+
+
+def posttraining():
+    """
+    executed after training  # Add things you want to execute
+    """
+    Logging.info("End training")
+
+
 def main():
+    pretraining()                                         
 
     if BC_TRAINING:
         for env in ENVS:
@@ -30,6 +50,8 @@ def main():
                 in_weights=f"train/BehavioralCloning{env}.weights",
                 out_weights=f"train/PreferenceBasedRL{env}.weights"
             )
+
+    posttraining()
 
 
 if __name__ == "__main__":
