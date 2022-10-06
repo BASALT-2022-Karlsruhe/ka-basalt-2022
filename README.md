@@ -16,6 +16,13 @@ For example to a shared folder, where all on your server have access to:
    3. `MODELS_ROOT='/home/shared/BASALT/models'` # Folder where you expect and save your models.
    4. `PORT=9898`
    5. `PYTHONUNBUFFERED=1`
+   6. `DATA_ROOT=data_wombat` 
+   7. `GIT_ACCESS_TOKEN=YOUR_TOKEN_HERE_123`
+
+where DATA_ROOT=data_wombat or DATA_ROOT=data 
+- data_wombat: Loads data from volume on mounted shared wombat-server folder 
+- data: Loads from volume on host server (Bison) 
+
 4. Build container and start docker container
    1. `sh run.sh`
 5. This starts `bin/bash` on the container . From here you can now start e.g. `train.py` to train your agent
