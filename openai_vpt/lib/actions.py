@@ -138,6 +138,7 @@ class ActionTransformer:
             "buttons": np.stack([acs.get(k, 0) for k in Buttons.ALL], axis=-1),
             "camera": self.discretize_camera(acs["camera"]),
         }
+        """ the member self.human_spaces is not defined anywhere; commenting out this block
         if not self.human_spaces:
             act.update(
                 {
@@ -147,6 +148,7 @@ class ActionTransformer:
                     "craft": self.item_embed_name_to_id(acs["craft"]),
                 }
             )
+        """
         return act
 
     def numpy_to_dict(self, acs):

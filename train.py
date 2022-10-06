@@ -1,7 +1,15 @@
 from utils.logs import Logging
 from utils import create_subfolders
-# Train one model for each task
 from behavioural_cloning import behavioural_cloning_train
+from preference_based_RL import preference_based_RL_train
+
+
+FOUNDATION_MODEL = "foundation-model-1x"
+BC_TRAINING = True
+PREFRL_TRAINING = True
+ENVS = ["FindCave", "MakeWaterfall",
+        "CreateVillageAnimalPen", "BuildVillageHouse"]
+
 
 def pretraining():
     """
@@ -12,48 +20,39 @@ def pretraining():
 
     Logging.info('Start training')
 
+
 def posttraining():
     """
     executed after training  # Add things you want to execute
     """
     Logging.info("End training")
 
+
 def main():
-    pretraining()
+    pretraining()                                         
 
-    Logging.info("===Training FindCave model===")
-    behavioural_cloning_train(
-        data_dir="data/MineRLBasaltFindCave-v0",
-        in_model="data/VPT-models/foundation-model-1x.model",
-        in_weights="data/VPT-models/foundation-model-1x.weights",
-        out_weights="train/MineRLBasaltFindCave.weights"
-    )
+    if BC_TRAINING:
+        for env in ENVS:
+            print(f"===BC Training {env} model===")
+            behavioural_cloning_train(
+                data_dir=f"data/MineRLBasalt{env}-v0",
+                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
+                in_weights=f"data/VPT-models/{FOUNDATION_MODEL}.weights",
+                out_weights=f"train/BehavioralCloning{env}.weights"
+            )
 
-    Logging.info("===Training MakeWaterfall model===")
-    behavioural_cloning_train(
-        data_dir="data/MineRLBasaltMakeWaterfall-v0",
-        in_model="data/VPT-models/foundation-model-1x.model",
-        in_weights="data/VPT-models/foundation-model-1x.weights",
-        out_weights="train/MineRLBasaltMakeWaterfall.weights"
-    )
-
-    Logging.info("===Training CreateVillageAnimalPen model===")
-    behavioural_cloning_train(
-        data_dir="data/MineRLBasaltCreateVillageAnimalPen-v0",
-        in_model="data/VPT-models/foundation-model-1x.model",
-        in_weights="data/VPT-models/foundation-model-1x.weights",
-        out_weights="train/MineRLBasaltCreateVillageAnimalPen.weights"
-    )
-
-    Logging.info("===Training BuildVillageHouse model===")
-    behavioural_cloning_train(
-        data_dir="data/MineRLBasaltBuildVillageHouse-v0",
-        in_model="data/VPT-models/foundation-model-1x.model",
-        in_weights="data/VPT-models/foundation-model-1x.weights",
-        out_weights="train/MineRLBasaltBuildVillageHouse.weights"
-    )
+    if PREFRL_TRAINING:
+        for env in ENVS:
+            print(f"===PrefRL Training {env} model===")
+            preference_based_RL_train(
+                env_str=env,
+                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
+                in_weights=f"train/BehavioralCloning{env}.weights",
+                out_weights=f"train/PreferenceBasedRL{env}.weights"
+            )
 
     posttraining()
+
 
 if __name__ == "__main__":
     main()

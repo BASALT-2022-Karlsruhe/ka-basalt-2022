@@ -98,14 +98,16 @@ class MineRLAgent:
         action_space = self.action_mapper.get_action_space_update()
         action_space = DictType(**action_space)
 
-        self.action_transformer = ActionTransformer(**ACTION_TRANSFORMER_KWARGS)
+        self.action_transformer = ActionTransformer(
+            **ACTION_TRANSFORMER_KWARGS)
 
         if policy_kwargs is None:
             policy_kwargs = POLICY_KWARGS
         if pi_head_kwargs is None:
             pi_head_kwargs = PI_HEAD_KWARGS
 
-        agent_kwargs = dict(policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs, action_space=action_space)
+        agent_kwargs = dict(policy_kwargs=policy_kwargs,
+                            pi_head_kwargs=pi_head_kwargs, action_space=action_space)
 
         self.policy = MinecraftAgentPolicy(**agent_kwargs).to(device)
         self.hidden_state = self.policy.initial_state(1)
@@ -113,7 +115,8 @@ class MineRLAgent:
 
     def load_weights(self, path):
         """Load model weights from a path, and reset hidden state"""
-        self.policy.load_state_dict(th.load(path, map_location=self.device), strict=False)
+        self.policy.load_state_dict(
+            th.load(path, map_location=self.device), strict=False)
         self.reset()
 
     def reset(self):
@@ -142,7 +145,8 @@ class MineRLAgent:
                 "camera": agent_action["camera"].cpu().numpy()
             }
         minerl_action = self.action_mapper.to_factored(action)
-        minerl_action_transformed = self.action_transformer.policy2env(minerl_action)
+        minerl_action_transformed = self.action_transformer.policy2env(
+            minerl_action)
         return minerl_action_transformed
 
     def _env_action_to_agent(self, minerl_action_transformed, to_torch=False, check_if_null=False):
@@ -156,7 +160,8 @@ class MineRLAgent:
         transformation. This matches the behaviour done in OpenAI's VPT work.
         If action is null, return "None" instead
         """
-        minerl_action = self.action_transformer.env2policy(minerl_action_transformed)
+        minerl_action = self.action_transformer.env2policy(
+            minerl_action_transformed)
         if check_if_null:
             if np.all(minerl_action["buttons"] == 0) and np.all(minerl_action["camera"] == self.action_transformer.camera_zero_bin):
                 return None
@@ -166,7 +171,8 @@ class MineRLAgent:
             minerl_action = {k: v[None] for k, v in minerl_action.items()}
         action = self.action_mapper.from_factored(minerl_action)
         if to_torch:
-            action = {k: th.from_numpy(v).to(self.device) for k, v in action.items()}
+            action = {k: th.from_numpy(v).to(self.device)
+                      for k, v in action.items()}
         return action
 
     def get_action(self, minerl_obs):
