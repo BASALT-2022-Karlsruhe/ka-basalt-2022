@@ -54,6 +54,9 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             obs, first, state_in
         )
 
+        # update MineRLAgent's hidden state (important: only do this in forward()!)
+        self.minerl_agent.hidden_state = state_out
+
         # action sampling
         action = self.action_net.sample(pi_logits, deterministic=deterministic)
 
