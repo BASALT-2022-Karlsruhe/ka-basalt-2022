@@ -166,10 +166,10 @@ if __name__ == "__main__":
     import pickle
 
     from stable_baselines3 import PPO
-    import minerl
-
+    import minerl  # noqa: F401
     from openai_vpt.agent import MineRLAgent
     from gym_wrappers import (
+        ObservationToCPU,
         RewardModelWrapper,
         DictToMultiDiscreteActionSpace,
         HiddenStateObservationSpace,
@@ -201,6 +201,7 @@ if __name__ == "__main__":
     # Make env compatible with SB3
     wrapped_env = DictToMultiDiscreteActionSpace(env, minerl_agent)
     wrapped_env = HiddenStateObservationSpace(wrapped_env, minerl_agent)
+    wrapped_env = ObservationToCPU(wrapped_env)
 
     # Augment MineRL env with reward model
     wrapped_env = RewardModelWrapper(
