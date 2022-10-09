@@ -4,6 +4,30 @@ import numpy as np
 import torch as th
 
 
+class ObservationToCPU(gym.Wrapper):
+    """Transfers Tensor observations to CPU"""
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def _to_cpu(self, obs):
+        if isinstance(obs, dict):
+            for key, obs_val in obs.items():
+                if isinstance(obs_val, th.Tensor):
+                    obs[key] = obs[key].cpu()
+        elif isinstance(obs, th.Tensor):
+            obs = obs.cpu()
+        return obs
+
+    def reset(self):
+        obs = self.env.reset()
+        return self._to_cpu(obs)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        return self._to_cpu(obs), rew, done, info
+
+
 class RewardModelWrapper(gym.Wrapper):
     """Replaces the environment reward with the one obtained
     under a reward model"""
