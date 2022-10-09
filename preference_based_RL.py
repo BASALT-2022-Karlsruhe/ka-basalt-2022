@@ -8,10 +8,10 @@ from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import BasicRewardNet
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
-import minerl
+import minerl  # noqa: F401
 from openai_vpt.agent import MineRLAgent
 
-import sb3_minerl_envs
+import sb3_minerl_envs  # noqa: F401
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
 
 
