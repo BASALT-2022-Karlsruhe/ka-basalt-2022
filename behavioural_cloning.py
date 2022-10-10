@@ -44,7 +44,8 @@ WEIGHT_DECAY = 0.0
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
 
-MAX_BATCHES = 2000 if USING_FULL_DATASET else int(1e9)
+# MAX_BATCHES = 2000 if USING_FULL_DATASET else int(1e9)
+MAX_BATCHES = int(1e9)
 
 def load_model_parameters(path_to_model_file):
     agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -166,6 +167,11 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
         if batch_i > MAX_BATCHES:
             break
+
+        if batch_i % 1000 == 0:
+            print(f"Save weights to .tmp.{batch_i}")
+            state_dict = policy.state_dict()
+            th.save(state_dict, out_weights + f".tmp.{batch_i}")
 
     state_dict = policy.state_dict()
     th.save(state_dict, out_weights)
