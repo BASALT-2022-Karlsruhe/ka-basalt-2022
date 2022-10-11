@@ -4,6 +4,22 @@ import numpy as np
 import torch as th
 
 
+class ObservationToInfos(gym.Wrapper):
+    """
+    Adds the observation to the infos dict.
+    Useful when adding other wrappers that
+    transform the original observation.
+    """
+
+    def __init_(self, env):
+        super().__init__(env)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        info["original_obs"] = obs
+        return obs, rew, done, info
+
+
 class ObservationToCPU(gym.Wrapper):
     """Transfers Tensor observations to CPU"""
 
