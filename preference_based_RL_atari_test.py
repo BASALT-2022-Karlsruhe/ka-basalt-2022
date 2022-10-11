@@ -10,13 +10,22 @@ from imitation.rewards.reward_nets import (
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
 
+from gym_wrappers import ObservationToInfos
+
 
 def main():
 
-    venv = make_vec_env("Pong-v0", post_wrappers=[lambda env, i: AtariWrapper(env)])
+    venv = make_vec_env(
+        "Pong-v0",
+        post_wrappers=[
+            lambda env, i: AtariWrapper(ObservationToInfos(env)),
+        ],
+    )
 
     reward_net = CnnRewardNet(
-        venv.observation_space, venv.action_space, use_action=True,
+        venv.observation_space,
+        venv.action_space,
+        use_action=True,
     )
     normalized_reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(normalized_reward_net)
@@ -25,8 +34,8 @@ def main():
 
     # gatherer = preference_comparisons.SyntheticGatherer(seed=0)
     gatherer = preference_comparisons.PrefCollectGatherer(
-       pref_collect_address="http://127.0.0.1:8000",
-       video_output_dir="/home/robert/Projects/BASALT/pref_collect/videofiles/",
+        pref_collect_address="http://127.0.0.1:8000",
+        video_output_dir="/home/robert/Projects/BASALT/pref_collect/videofiles/",
     )
 
     reward_trainer = preference_comparisons.BasicRewardTrainer(
