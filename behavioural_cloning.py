@@ -171,7 +171,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             break
 
         if batch_i % 2000 == 0:
-            print(f"Save weights to .tmp.{batch_i}")
+            Logging.info(f"Save weights to .tmp.{batch_i}")
             state_dict = policy.state_dict()
             th.save(state_dict, out_weights + f".tmp.{batch_i}")
 
