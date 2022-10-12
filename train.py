@@ -35,9 +35,7 @@ def main():
 
     if BC_TRAINING:
         for env in ENVS:
-            message = f"===BC Training {env} model==="
-            print(message)
-            Logging.info(message)
+            Logging.info(f"===BC Training {env} model===")
             behavioural_cloning_train(
                 data_dir=f"data/MineRLBasalt{env}-v0",
                 in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
@@ -47,9 +45,7 @@ def main():
 
     if PREFRL_TRAINING:
         for env in ENVS:
-            message = f"===PrefRL Training {env} model==="
-            print(message)
-            Logging.info(message)
+            Logging.info(f"===PrefRL Training {env} model===")
             preference_based_RL_train(
                 env_str=env,
                 in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
