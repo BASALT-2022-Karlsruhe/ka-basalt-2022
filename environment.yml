@@ -10,6 +10,7 @@ dependencies:
   - pip:
     - git+https://github.com/minerllabs/minerl
     - matplotlib
+    - tqdm
     - coloredlogs
     - aicrowd-api
     - aicrowd-gym
