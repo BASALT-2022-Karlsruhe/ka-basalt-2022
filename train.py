@@ -2,7 +2,8 @@ from utils.logs import Logging
 from utils import create_subfolders
 from behavioural_cloning import behavioural_cloning_train
 from preference_based_RL import preference_based_RL_train
-
+from utils.visualizer import visualize_loss
+from datetime import datetime
 
 FOUNDATION_MODEL = "foundation-model-1x"
 BC_TRAINING = True
@@ -10,26 +11,27 @@ PREFRL_TRAINING = True
 ENVS = ["FindCave", "MakeWaterfall",
         "CreateVillageAnimalPen", "BuildVillageHouse"]
 
+LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 
-def pretraining():
+def pre_training():
     """
     executed before training # Add things you want to execute
     """
     create_subfolders.main()
-    Logging.setup()
+    Logging.setup(name=LOG_FILE)
 
     Logging.info('Start training')
 
 
-def posttraining():
+def post_training():
     """
     executed after training  # Add things you want to execute
     """
+    visualize_loss(log_file_path=f"/home/aicrowd/train/{LOG_FILE}")
     Logging.info("End training")
 
-
 def main():
-    pretraining()                                         
+    pre_training()
 
     if BC_TRAINING:
         for env in ENVS:
@@ -51,7 +53,7 @@ def main():
                 out_weights=f"train/PreferenceBasedRL{env}.weights"
             )
 
-    posttraining()
+    post_training()
 
 
 if __name__ == "__main__":
