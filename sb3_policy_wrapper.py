@@ -156,6 +156,9 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
             state_in1 = obs["state_in1"][:, i, :, :]
             if th.isnan(state_in1).all():
                 state_in1 = None
+            else:
+                state_in1 = state_in1.bool()
+                
             state_in_tuple = (
                 state_in1,
                 (obs["state_in2"][:, i, :, :], obs["state_in3"][:, i, :, :]),
