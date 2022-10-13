@@ -4,6 +4,10 @@ import gym
 import torch as th
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.type_aliases import Schedule
+from stable_baselines3.common.distributions import (
+    Distribution,
+    MultiCategoricalDistribution,
+)
 from openai_vpt.agent import MineRLAgent
 
 
@@ -134,6 +138,46 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
 
         return value
 
+    def get_distribution(self, obs: Dict[str, th.Tensor]) -> Distribution:
+        """
+        Get the current policy distribution given the observations.
+
+        :param obs:
+        :return: the action distribution.
+        """
+        # unpack observation
+        img_obs, first, state_in = self.unpack_dict_obs(obs)
+
+        # inference
+        (latent_pi, _), state_out = self.minerl_agent.policy.net(
+            img_obs,
+            state_in,
+            {"first": first},
+        )
+        # features = self.extract_features(obs)
+        # latent_pi = self.mlp_extractor.forward_actor(features)
+        return self._get_action_dist_from_latent(latent_pi)
+
+    def _get_action_dist_from_latent(self, latent_pi: th.Tensor) -> Distribution:
+        """
+        Retrieve action distribution given the latent codes.
+
+        :param latent_pi: Latent code for the actor
+        :return: Action distribution
+        """
+        mean_actions = self.action_net(latent_pi)
+        # convert mean agent actions to mean array actions
+        mean_array_actions = (
+            th.cat((mean_actions["camera"], mean_actions["buttons"]), -1)
+            .squeeze(0)
+            .squeeze(0)
+        )
+
+        if isinstance(self.action_dist, MultiCategoricalDistribution):
+            return self.action_dist.proba_distribution(action_logits=mean_array_actions)
+        else:
+            raise ValueError("Invalid action distribution")
+
     def unpack_dict_obs(
         self, obs: Dict[str, th.Tensor]
     ) -> Tuple[
@@ -158,7 +202,7 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
                 state_in1 = None
             else:
                 state_in1 = state_in1.bool()
-                
+
             state_in_tuple = (
                 state_in1,
                 (obs["state_in2"][:, i, :, :], obs["state_in3"][:, i, :, :]),
