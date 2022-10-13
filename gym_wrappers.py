@@ -121,6 +121,8 @@ class DictToMultiDiscreteActionSpace(gym.Wrapper):
         return agent_action
 
     def step(self, action):
+        if len(action.shape) < 2:
+            action = action[np.newaxis, :]
         # transform array action to agent action to MineRL action
         agent_action = self.to_agent_action(action)
         minerl_action = self.minerl_agent._agent_action_to_env(agent_action)
@@ -152,7 +154,7 @@ class HiddenStateObservationSpace(gym.Wrapper):
 
         self.observation_space = Dict(
             {
-                "img": Box(-10, 10, shape=img_shape),
+                "img": Box(0, 255, shape=img_shape, dtype=np.uint8),
                 "first": Box(-10, 10, shape=first_shape),
                 "state_in1": Box(-10, 10, shape=(4, 1, 128)),
                 "state_in2": Box(-10, 10, shape=(4, 128, 1024)),
