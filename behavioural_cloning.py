@@ -4,20 +4,22 @@
 #       This will fit inside even smaller GPUs (tested on 8GB one),
 #       but is slow.
 
-from argparse import ArgumentParser
 import pickle
 import time
 
+import wandb
 import gym
 import minerl
 import torch as th
 import numpy as np
 
+from argparse import ArgumentParser
 from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 from utils.logs import Logging
 from utils.visualizer import visualize_loss
+
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
@@ -162,6 +164,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         optimizer.zero_grad()
 
         loss_sum += batch_loss
+        
+        wandb.log({'loss': loss_sum})
+
         if batch_i % LOSS_REPORT_RATE == 0:
             time_since_start = time.time() - start_time
             Logging.info(f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}")
