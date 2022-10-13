@@ -27,6 +27,7 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=False, reco
 
     for _ in range(n_episodes):
         obs = env.reset()
+        n_steps = 0
         while True:
             action = agent.get_action(obs)
             # ESC is not part of the predictions model.
@@ -35,7 +36,10 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=False, reco
             action["ESC"] = 0
             obs, _, done, _ = env.step(action)
             if show:
+                if n_steps % 10 == 0:
+                    print(f"Step {n_steps}")
                 env.render()
+            n_steps += 1
             if done:
                 break
     env.close()
