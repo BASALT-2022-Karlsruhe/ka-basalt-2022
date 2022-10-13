@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import pickle
 
 import torch as th
+import numpy as np
 import gym
 from stable_baselines3 import PPO
 from imitation.algorithms import preference_comparisons
@@ -17,6 +18,7 @@ from openai_vpt.agent import MineRLAgent
 
 import sb3_minerl_envs  # noqa: F401
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
+from gym_wrappers import ObservationToInfos
 
 
 def load_model_parameters(path_to_model_file):
@@ -46,7 +48,12 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     # Setup MineRL VecEnv
     venv = make_vec_env(
-        minerl_env_str + "SB3-v0", env_make_kwargs={"minerl_agent": minerl_agent}
+        minerl_env_str + "SB3-v0",
+        n_envs=1,
+        env_make_kwargs={"minerl_agent": minerl_agent},
+        post_wrappers=[
+            lambda env, i: ObservationToInfos(env),
+        ],
     )
 
     # Setup preference-based reinforcement learning using the imitation package
@@ -54,9 +61,8 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     # TODO use a suitable reward model architecture,
     # e.g. reuse ImpalaCNN from the VPT models with a regression head
-    reward_net = CnnRewardNet(
-        venv.observation_space["img"], venv.action_space, use_action=False
-    )
+    image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
+    reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
     normalized_reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(normalized_reward_net)
 
