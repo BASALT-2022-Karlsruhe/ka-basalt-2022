@@ -36,7 +36,7 @@ services:
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
-  ka-basalt-2022-datadownloader_data_wombat:
+  ka-basalt-2022-datadownloader_data_wombat2:
     external: true
   models:
     name: ka-basalt-2022-models-${NAME}-${VERSION}
