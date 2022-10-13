@@ -18,8 +18,6 @@ from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 from utils.logs import Logging
-from utils.visualizer import visualize_loss
-
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
@@ -47,8 +45,7 @@ WEIGHT_DECAY = 0.0
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
 
-MAX_BATCHES = 2700 if USING_FULL_DATASET else int(1e9)
-# MAX_BATCHES = int(1e9)
+MAX_BATCHES = 100 if USING_FULL_DATASET else int(1e9)
 
 
 def load_model_parameters(path_to_model_file):
@@ -58,7 +55,19 @@ def load_model_parameters(path_to_model_file):
     pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
     return policy_kwargs, pi_head_kwargs
 
+
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
+
+    # save config
+    wandb.config.epochs = EPOCHS
+    wandb.config.batch_size = BATCH_SIZE
+    wandb.config.n_workers = N_WORKERS
+    wandb.config.learning_rate = LEARNING_RATE
+    wandb.config.weight_decay = WEIGHT_DECAY
+    wandb.config.kl_loss_weight = KL_LOSS_WEIGHT
+    wandb.config.max_grad_norm = MAX_GRAD_NORM
+    wandb.config.max_batches = MAX_BATCHES
+
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
     # To create model with the right environment.
@@ -165,7 +174,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
         loss_sum += batch_loss
         
-        wandb.log({'loss': loss_sum})
+        wandb.log({'loss': batch_loss})
 
         if batch_i % LOSS_REPORT_RATE == 0:
             time_since_start = time.time() - start_time
