@@ -19,6 +19,7 @@ ENV HOME_DIR /home/$USER
 ENV CONDA_DEFAULT_ENV="minerl"
 ENV PATH /home/aicrowd/.conda/envs/minerl/bin:$PATH
 ENV FORCE_CUDA="1"
+ENV WANDB_API_KEY e0c7089dbdad92ca48e62ce2fef2e26fe2a0eb64 
 
 ARG git_access_token
 ENV GIT_ACCESS_TOKEN $git_access_token
