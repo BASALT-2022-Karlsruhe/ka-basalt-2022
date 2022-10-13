@@ -19,3 +19,6 @@ dependencies:
     - torch==1.12.1+cu113
     - werkzeug==2.1
     - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git@human-preferences
+    - opencv-python-headless
+    - django
+    - djangorestframework
