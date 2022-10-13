@@ -34,17 +34,18 @@ Demos are split into three parts based on when construction is happening (detect
 ### Stage 1 - Prior to construction (find spot, sometimes find animals)
 Example (snippet):
 
-https://user-images.githubusercontent.com/907550/195624447-882c92b6-b32f-4420-b886-f1f1bed091e4.mp4
+https://user-images.githubusercontent.com/907550/195632545-38de3f61-87d1-410b-aa97-d6f76954e9e1.mp4
+
 
 ### Stage 2 - Construction
 Example (snippet):
 
-https://user-images.githubusercontent.com/907550/195625963-b862f61c-60f2-4a4e-b261-59897bbd5be0.mp4
+https://user-images.githubusercontent.com/907550/195632508-56e727fb-8077-4e05-b954-9ce92aafac66.mp4
 
 ### Stage 3 - Bring animals to pen
 Example (snippet):
 
-https://user-images.githubusercontent.com/907550/195625939-4a129cc1-bede-4a49-a604-87a8ffcb552b.mp4
+https://user-images.githubusercontent.com/907550/195632409-4910473c-2e56-486a-ad22-ba42f87c8b9b.mp4
 
 ## BuildVillageHouse
 Demos are split into three parts based on when construction is happening (detected via inventory changes).
