@@ -5,6 +5,7 @@ from preference_based_RL import preference_based_RL_train
 from utils.visualizer import visualize_loss
 from utils.create_videos import create_videos
 from datetime import datetime
+import wandb
 
 FOUNDATION_MODEL = "foundation-model-1x"
 BC_TRAINING = True
@@ -20,6 +21,9 @@ def pre_training():
     """
     executed before training # Add things you want to execute
     """
+    wandb.init(project="BASALT")
+
+
     create_subfolders.main()
     Logging.setup(name=LOG_FILE)
 

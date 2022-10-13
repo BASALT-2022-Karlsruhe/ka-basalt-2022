@@ -30,5 +30,7 @@ SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
 COPY environment.yml environment.yml
 RUN conda env update --name minerl -f environment.yml --prune
 
+RUN wandb login
+
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd
