@@ -1,37 +1,29 @@
-from genericpath import exists
 import json
 from pathlib import Path
 from tqdm import tqdm
 import argparse
+import cv2
 
 
-def has_early_esc(filepath, n_actions_allowed=200):
-    with open(filepath) as demo:
-        action_list = list(demo)
-    n_actions_after_esc = 0
-    esc_pressed = False
-    for json_str in action_list:
-        try:
-            keys = json.loads(json_str)["keyboard"]["keys"]
-        except:
-            continue
-        if "key.keyboard.escape" in keys:
-            esc_pressed = True
-        elif esc_pressed:
-            n_actions_after_esc += 1
-        if n_actions_after_esc > n_actions_allowed:
-            return True
-    return False
-
-
-def ends_prematurely(filepath, min_actions=100):
+def is_short(filepath, min_actions=100):
     with open(filepath) as demo:
         action_list = list(demo)
     if len(action_list) < min_actions:
         return True
 
 
-def remove_early_esc(in_path, n_actions_allowed=200, out_path=""):
+def get_length_diff(traj):
+    with open(traj) as demo:
+        action_list = list(demo)
+    len_traj = len(action_list)
+
+    vid = traj.with_suffix(".mp4")
+    cap = cv2.VideoCapture(str(vid))
+    len_vid = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    return len_traj - len_vid
+
+
+def remove_early_esc(in_path, out_path, percent_actions_allowed=10):
     with open(in_path) as demo:
         action_list = list(demo)
     n_actions_after_esc = 0
@@ -43,7 +35,10 @@ def remove_early_esc(in_path, n_actions_allowed=200, out_path=""):
         keys = action["keyboard"]["keys"]
         new_keys = action["keyboard"]["newKeys"]
 
-        if "key.keyboard.escape" in keys and n_actions_after_esc > n_actions_allowed:
+        if (
+            "key.keyboard.escape" in keys
+            and n_actions_after_esc > percent_actions_allowed
+        ):
             keys.remove("key.keyboard.escape")
             if "key.keyboard.escape" in new_keys:
                 new_keys.remove("key.keyboard.escape")
@@ -65,29 +60,23 @@ def get_demo_trajectories(dir):
     return trajectories
 
 
-def add_esc(in_path, out_path=""):
-    with open(in_path) as demo:
+def is_unfinished(traj, percent_actions_allowed=10):
+    with open(traj) as demo:
         action_list = list(demo)
-    try:
-        last_action = json.loads(action_list[-1])
-    except:
-        pass
-    last_keys = last_action["keyboard"]["keys"]
-    last_new_keys = last_action["keyboard"]["keys"]
-    if not "key.keyboard.escape" in last_keys:
-        last_keys.append("key.keyboard.escape")
-        last_new_keys.append("key.keyboard.escape")
-    action_list[-1] = str(json.dumps(last_action))
-
-    out_path_file = out_path / in_path.parts[-2] / in_path.name if out_path else in_path
-    out_path_file.parents[0].mkdir(parents=True, exist_ok=True)
-    with open(out_path_file, "w+") as demo:
-        demo.writelines(action_list)
+    n_actions_allowed = int(len(action_list) * percent_actions_allowed / 100) + 1
+    for action in action_list[:-n_actions_allowed:-1]:
+        try:
+            action = json.loads(action)
+        except:
+            continue
+        if "key.keyboard.escape" in action["keyboard"]["keys"]:
+            return False
+    return True
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        "Script for preparing and filtering demonstrations."
+        "Script for preparing and filtering demonstrations. Filtered demos are saved in 'bad_demos.txt'. Altered demos are saved in 'prepped_demos.txt'."
     )
     parser.add_argument(
         "Dir",
@@ -97,25 +86,25 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--remove_early_esc",
-        action="store_false",
-        help="Whether to remove escape presses that are followed by a certain number of non-escape actions.",
+        action="store_true",
+        help="Add flag to remove escape presses that are followed by a certain number of non-escape actions.",
     )
     parser.add_argument(
-        "--add_final_esc",
+        "--list_short",
         action="store_false",
-        help="Whether to add escape to the final action of demos",
+        help="Add flag to not list demos containing less than 'min_actions' actions.",
     )
     parser.add_argument(
-        "--list_short_demos",
+        "--list_unfinished",
         action="store_false",
-        help="Whether to list demos containing less than 'min_actions' actions. The filepaths are saved in 'short_demos.txt'.",
+        help="Add flag to not list demos that don't have an esc within the final '--percent_actions_allowed'.",
     )
     parser.add_argument(
-        "--max_post_esc_actions",
+        "--percent_actions_allowed",
         type=int,
-        default=200,
+        default=10,
         required=False,
-        help="Number of non-escape actions allowed after escape to not remove it.",
+        help="Percentage of non-escape actions relative to number of total actions allowed after escape to not remove it.",
     )
     parser.add_argument(
         "--min_actions",
@@ -124,45 +113,35 @@ if __name__ == "__main__":
         required=False,
         help="Demos with less than this number of actions will be listed if listing short demos.",
     )
-    parser.add_argument(
-        "--output_dir",
-        default="",
-        required=False,
-        help="Directory where the altered demos will be saved. If not provided, the original demos will be overwritten.",
-    )
 
     args = parser.parse_args()
     dir = args.Dir
 
     basepath = Path(__file__).parent.resolve()
-    if args.output_dir:
-        out_path = basepath / args.output_dir
-    else:
-        out_path = basepath / "prepped_demos"
-    out_path.mkdir(parents=True, exist_ok=True)
 
+    out_path = basepath / "prepped_demos"
+    out_path.mkdir(parents=True, exist_ok=True)
     traj_paths = get_demo_trajectories(dir)
+
+    bad_demo_list = basepath / "bad_demos.txt"
+
+    if args.list_unfinished or args.list_short:
+        pbar = tqdm(traj_paths)
+        pbar.set_description("Listing bad demos")
+        with open(bad_demo_list, "w") as f:
+            for path in pbar:
+                list_demo = (is_unfinished(path) and args.list_unfinished) or (
+                    is_short(path) and args.list_short
+                )
+                if list_demo:
+                    f.write(str(path) + "\n")
 
     if args.remove_early_esc:
         pbar = tqdm(traj_paths)
         pbar.set_description("Removing premature escape presses from demos")
         for path in pbar:
             remove_early_esc(
-                path, n_actions_allowed=args.max_post_esc_actions, out_path=out_path
+                path,
+                out_path=out_path,
+                percent_actions_allowed=args.percent_actions_allowed,
             )
-
-    if args.add_final_esc:
-        pbar = tqdm(traj_paths)
-        pbar.set_description("Adding escape presses to final action of demos")
-        for path in pbar:
-            add_esc(path, out_path=out_path)
-
-    short_demo_list = basepath / "short_demos.txt"
-
-    if args.list_short_demos:
-        pbar = tqdm(traj_paths)
-        pbar.set_description("Listing demos")
-        with open(short_demo_list, "w") as f:
-            for path in pbar:
-                if ends_prematurely(path, min_actions=args.min_actions):
-                    f.write(str(path) + "\n")
