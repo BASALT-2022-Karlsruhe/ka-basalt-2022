@@ -45,7 +45,7 @@ WEIGHT_DECAY = 0.0
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
 
-MAX_BATCHES = 100 if USING_FULL_DATASET else int(1e9)
+MAX_BATCHES = 2700 if USING_FULL_DATASET else int(1e9)
 
 
 def load_model_parameters(path_to_model_file):
