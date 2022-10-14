@@ -9,4 +9,3 @@ def visualize_loss(log_file_path, output_path="avrg_loss_findcave_full_dataset.p
     plt.xlabel("num batches")
     plt.ylabel("loss")
     plt.savefig(output_path)
-    plt.show()
