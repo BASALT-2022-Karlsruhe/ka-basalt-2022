@@ -70,7 +70,7 @@ class MinecraftActorCriticPolicy(ActorCriticPolicy):
         # convert agent action into array so it can pass through the SB3 functions
         array_action = th.cat((action["camera"], action["buttons"]), dim=-1)
 
-        return array_action, value, log_prob
+        return array_action.squeeze(1), value, log_prob
 
     def _build(self, lr_schedule: Schedule) -> None:
         """
