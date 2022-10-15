@@ -7,7 +7,6 @@ import gym
 from stable_baselines3 import PPO
 from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import (
-    BasicRewardNet,
     CnnRewardNet,
     NormalizedRewardNet,
 )
@@ -50,10 +49,8 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     venv = make_vec_env(
         minerl_env_str + "SB3-v0",
         n_envs=1,
+        max_episode_steps=10,
         env_make_kwargs={"minerl_agent": minerl_agent},
-        post_wrappers=[
-            lambda env, i: ObservationToInfos(env),
-        ],
     )
 
     # Setup preference-based reinforcement learning using the imitation package
@@ -74,7 +71,7 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     # gatherer = preference_comparisons.SyntheticGatherer(seed=0)
     gatherer = preference_comparisons.PrefCollectGatherer(
         pref_collect_address="http://127.0.0.1:8000",
-        video_output_dir="/home/aicrowd/videofiles/",
+        video_output_dir="/home/aicrowd/pref-collect/videofiles/",
     )
 
     # TODO imitation also provides EnsembleTrainer
