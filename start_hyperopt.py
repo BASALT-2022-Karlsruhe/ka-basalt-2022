@@ -27,7 +27,7 @@ if __name__ == '__main__':
                                         f.write("MODELS_ROOT='/home/shared/BASALT/models'\n")
                                         f.write("PORT=9898\n")
                                         f.write("PYTHONUNBUFFERED=1\n")
-                                        f.write("EVALUATION_STAGE=testing\n")
+                                        f.write("EVALUATION_STAGE='all'\n")
                                         f.write("GIT_ACCESS_TOKEN=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\n")
                                         f.write("DATA_ROOT=data_wombat\n")
                                         f.write(f"EPOCHS={epoch}\n")
