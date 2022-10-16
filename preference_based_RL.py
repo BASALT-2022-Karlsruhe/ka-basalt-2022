@@ -39,11 +39,20 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     minerl_agent = MineRLAgent(
         env,
-        device="cpu",  # "cuda" for GPU usage!
+        device="cuda",
         policy_kwargs=agent_policy_kwargs,
         pi_head_kwargs=agent_pi_head_kwargs,
     )
     minerl_agent.load_weights(in_weights)
+
+    # Freeze most params if using small dataset
+    for param in minerl_agent.policy.parameters():
+        param.requires_grad = False
+    # Unfreeze final layers
+    for param in minerl_agent.policy.net.lastlayer.parameters():
+        param.requires_grad = True
+    for param in minerl_agent.policy.pi_head.parameters():
+        param.requires_grad = True
 
     # Setup MineRL VecEnv
     venv = make_vec_env(
@@ -56,8 +65,7 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     # Setup preference-based reinforcement learning using the imitation package
     # TODO In general, check whether algorithm hyperparams make sense and tune
 
-    # TODO use a suitable reward model architecture,
-    # e.g. reuse ImpalaCNN from the VPT models with a regression head
+    # TODO reuse ImpalaCNN from the VPT models with a regression head
     image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
     reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
     normalized_reward_net = NormalizedRewardNet(reward_net, RunningNorm)
@@ -67,8 +75,6 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     # e.g. only compare last parts of episodes
     fragmenter = preference_comparisons.RandomFragmenter(warning_threshold=0, seed=0)
 
-    # TODO design gatherer that obtains preferences from web interface
-    # gatherer = preference_comparisons.SyntheticGatherer(seed=0)
     gatherer = preference_comparisons.PrefCollectGatherer(
         pref_collect_address="http://127.0.0.1:8000",
         video_output_dir="/home/aicrowd/pref-collect/videofiles/",
