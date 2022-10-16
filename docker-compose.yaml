@@ -7,7 +7,7 @@ services:
     stdin_open: true # docker run -i
     tty: true        # docker run -t
 
-    entrypoint: "xvfb-run python run.py"
+    entrypoint: "xvfb-run python train.py"
 
     init: true
 
