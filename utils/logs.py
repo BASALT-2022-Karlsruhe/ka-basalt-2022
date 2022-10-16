@@ -1,6 +1,4 @@
 import logging
-from datetime import datetime
-
 
 class Logging(object):
   logger = None
@@ -10,11 +8,10 @@ class Logging(object):
       Logging.logger.info(message)
 
   @staticmethod
-  def setup():
+  def setup(name):
       logging.basicConfig(level=logging.INFO,
                           handlers=[
-                              logging.FileHandler(
-                                  f"/home/aicrowd/train/logs/log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"),
+                              logging.FileHandler(f"/home/aicrowd/train/logs/{name}"),
                               logging.StreamHandler()
                           ],
                           format='%(asctime)s %(message)s'
