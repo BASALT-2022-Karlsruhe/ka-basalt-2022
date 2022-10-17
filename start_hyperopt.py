@@ -29,7 +29,7 @@ if __name__ == '__main__':
                                         f.write("PYTHONUNBUFFERED=1\n")
                                         f.write("EVALUATION_STAGE='all'\n")
                                         f.write("GIT_ACCESS_TOKEN=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\n")
-                                        f.write("DATA_ROOT=data_wombat\n")
+                                        f.write("DATA_ROOT=data_wombat2\n")
                                         f.write(f"EPOCHS={epoch}\n")
                                         f.write(f"BATCH_SIZE={batch_size}\n")
                                         f.write(f"N_WORKERS={n_worker}\n")
@@ -39,5 +39,5 @@ if __name__ == '__main__':
                                         f.write(f"MAX_BATCHES={max_batch}\n")
                                         f.close()
                                         subprocess.call(['sh',
-                                                         './run.sh'])  # Thanks @Jim Dennis for suggesting the []
+                                                         './run.sh'])  
 
