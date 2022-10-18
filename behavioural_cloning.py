@@ -58,6 +58,30 @@ def load_model_parameters(path_to_model_file):
 
 
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
+    EPOCHS = int(os.getenv("EPOCHS", 1))
+    # Needs to be <= number of videos
+    BATCH_SIZE = int(os.getenv("BATCH_SIZE", 32))
+    # Ideally more than batch size to create
+    # variation in datasets (otherwise, you will
+    # get a bunch of consecutive samples)
+    # Decrease this (and batch_size) if you run out of memory
+    N_WORKERS = int(os.getenv("N_WORKERS", 50))
+    DEVICE = "cuda"
+
+    LOSS_REPORT_RATE = 100
+
+    # Tuned with bit of trial and error
+    LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
+    # OpenAI VPT BC weight decay
+    # WEIGHT_DECAY = 0.039428
+    WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
+    # KL loss to the original model was not used in OpenAI VPT
+    KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+    MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
+
+    MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
+
+
 
     # save config
     wandb.config.epochs = EPOCHS
