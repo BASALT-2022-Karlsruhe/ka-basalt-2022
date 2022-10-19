@@ -78,7 +78,9 @@ def main():
             preference_based_RL_train(
                 env_str=env,
                 in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights=f"train/BehavioralCloning{env}.weights",
+                in_weights=f"train/BehavioralCloning{env}.weights"
+                if BC_TRAINING
+                else f"data/VPT-models/{FOUNDATION_MODEL}.weights",
                 out_weights=f"train/PreferenceBasedRL{env}.weights",
             )
             run.finish()
