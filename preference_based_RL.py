@@ -48,17 +48,21 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     # Freeze most params if using small dataset
     for param in minerl_agent.policy.parameters():
         param.requires_grad = False
-    # Unfreeze final layers
+    # Unfreeze final layers and policy and value head
     for param in minerl_agent.policy.net.lastlayer.parameters():
         param.requires_grad = True
     for param in minerl_agent.policy.pi_head.parameters():
+        param.requires_grad = True
+    for param in minerl_agent.policy.value_head.parameters():
         param.requires_grad = True
 
     # Setup MineRL VecEnv
     venv = make_vec_env(
         minerl_env_str + "SB3-v0",
+        # Keep this at 1 since we are not keeping track of multiple hidden states
         n_envs=1,
-        max_episode_steps=10,
+        # This should be sufficiently high for the given task
+        max_episode_steps=20,
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
 
@@ -73,7 +77,7 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     # TODO design more useful fragmenter for MineRL trajcetories,
     # e.g. only compare last parts of episodes
-    fragmenter = preference_comparisons.RandomFragmenter(warning_threshold=0, seed=0)
+    fragmenter = preference_comparisons.MineRLFragmenter(warning_threshold=0, seed=0)
 
     gatherer = preference_comparisons.PrefCollectGatherer(
         pref_collect_address="http://127.0.0.1:8000",
