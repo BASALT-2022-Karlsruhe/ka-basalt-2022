@@ -4,6 +4,22 @@ import numpy as np
 import torch as th
 
 
+class ObservationToInfos(gym.Wrapper):
+    """
+    Adds the observation to the infos dict.
+    Useful when adding other wrappers that
+    transform the original observation.
+    """
+
+    def __init_(self, env):
+        super().__init__(env)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        info["original_obs"] = obs
+        return obs, rew, done, info
+
+
 class ObservationToCPU(gym.Wrapper):
     """Transfers Tensor observations to CPU"""
 
@@ -105,6 +121,8 @@ class DictToMultiDiscreteActionSpace(gym.Wrapper):
         return agent_action
 
     def step(self, action):
+        if len(action.shape) < 2:
+            action = action[np.newaxis, :]
         # transform array action to agent action to MineRL action
         agent_action = self.to_agent_action(action)
         minerl_action = self.minerl_agent._agent_action_to_env(agent_action)
@@ -128,19 +146,21 @@ class HiddenStateObservationSpace(gym.Wrapper):
 
         self.minerl_agent = minerl_agent
 
-        # TODO determine state_in shapes from architecture
+        # define observation space based on model architecture
         img_shape = self.minerl_agent._env_obs_to_agent(
             self.env.observation_space.sample()
         )["img"].shape
         first_shape = self.minerl_agent._dummy_first.shape
+        img_width = img_shape[2]
+        hidden_width = self.minerl_agent.policy.net.lastlayer.layer.in_features
 
         self.observation_space = Dict(
             {
-                "img": Box(-10, 10, shape=img_shape),
+                "img": Box(0, 255, shape=img_shape, dtype=np.uint8),
                 "first": Box(-10, 10, shape=first_shape),
-                "state_in1": Box(-10, 10, shape=(4, 1, 128)),
-                "state_in2": Box(-10, 10, shape=(4, 128, 1024)),
-                "state_in3": Box(-10, 10, shape=(4, 128, 1024)),
+                "state_in1": Box(-10, 10, shape=(4, 1, img_width)),
+                "state_in2": Box(-10, 10, shape=(4, img_width, hidden_width)),
+                "state_in3": Box(-10, 10, shape=(4, img_width, hidden_width)),
             }
         )
 
