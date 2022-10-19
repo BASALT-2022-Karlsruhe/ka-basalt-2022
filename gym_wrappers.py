@@ -146,19 +146,21 @@ class HiddenStateObservationSpace(gym.Wrapper):
 
         self.minerl_agent = minerl_agent
 
-        # TODO determine state_in shapes from architecture
+        # define observation space based on model architecture
         img_shape = self.minerl_agent._env_obs_to_agent(
             self.env.observation_space.sample()
         )["img"].shape
         first_shape = self.minerl_agent._dummy_first.shape
+        img_width = img_shape[2]
+        hidden_width = self.minerl_agent.policy.net.lastlayer.layer.in_features
 
         self.observation_space = Dict(
             {
                 "img": Box(0, 255, shape=img_shape, dtype=np.uint8),
                 "first": Box(-10, 10, shape=first_shape),
-                "state_in1": Box(-10, 10, shape=(4, 1, 128)),
-                "state_in2": Box(-10, 10, shape=(4, 128, 1024)),
-                "state_in3": Box(-10, 10, shape=(4, 128, 1024)),
+                "state_in1": Box(-10, 10, shape=(4, 1, img_width)),
+                "state_in2": Box(-10, 10, shape=(4, img_width, hidden_width)),
+                "state_in3": Box(-10, 10, shape=(4, img_width, hidden_width)),
             }
         )
 
