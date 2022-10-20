@@ -12,7 +12,7 @@ from utils.create_videos import create_videos
 
 # from utils.visualizer import visualize_loss
 
-FOUNDATION_MODEL = "foundation-model-1x"
+FOUNDATION_MODEL = "foundation-model-2x"
 BC_TRAINING = True
 PREFRL_TRAINING = False
 ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
