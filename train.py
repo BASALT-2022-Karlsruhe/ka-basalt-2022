@@ -42,7 +42,8 @@ def post_training():
 
     Logging.info("Creating videos...")
     for i, env in enumerate(ENVS):
-        create_videos(env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i])
+        model = "BehavioralCloning" if not PREFRL_TRAINING else "PreferenceBasedRL"
+        create_videos(model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False)
     Logging.info("End training")
 
 
