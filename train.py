@@ -12,7 +12,7 @@ from utils.create_videos import create_videos
 
 # from utils.visualizer import visualize_loss
 
-FOUNDATION_MODEL = "foundation-model-1x"
+FOUNDATION_MODEL = "foundation-model-2x"
 BC_TRAINING = True
 PREFRL_TRAINING = False
 ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
@@ -42,7 +42,8 @@ def post_training():
 
     Logging.info("Creating videos...")
     for i, env in enumerate(ENVS):
-        create_videos(env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i])
+        model = "BehavioralCloning" if not PREFRL_TRAINING else "PreferenceBasedRL"
+        create_videos(model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False)
     Logging.info("End training")
 
 
