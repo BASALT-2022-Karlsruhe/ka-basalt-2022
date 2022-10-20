@@ -67,7 +67,7 @@ def main():
             ["python", "pref-collect/manage.py", "runserver", "0.0.0.0:8000"],
         )
 
-        for env in ENVS:
+        for i, env in enumerate(ENVS):
             run = wandb.init(
                 project=f"PrefRL Training {env}",
                 reinit=True,
@@ -78,10 +78,13 @@ def main():
             preference_based_RL_train(
                 env_str=env,
                 in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights=f"train/BehavioralCloning{env}.weights"
+                in_weights_policy=f"train/BehavioralCloning{env}.weights"
                 if BC_TRAINING
                 else f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                out_weights=f"train/PreferenceBasedRL{env}.weights",
+                out_weights_policy=f"train/PreferenceBasedRL{env}.weights",
+                in_weights_rewardnet=None,
+                out_weights_rewardnet=f"train/RewardNet{env}.weights",
+                max_episode_steps=NUM_MAX_STEPS[i],
             )
             run.finish()
             # Flush query database
