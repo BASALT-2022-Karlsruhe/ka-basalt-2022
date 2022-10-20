@@ -28,7 +28,15 @@ def load_model_parameters(path_to_model_file):
     return policy_kwargs, pi_head_kwargs
 
 
-def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
+def preference_based_RL_train(
+    env_str,
+    in_model,
+    in_weights_policy,
+    out_weights_policy,
+    in_weights_rewardnet,
+    out_weights_rewardnet,
+    max_episode_steps,
+):
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
@@ -43,7 +51,7 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         policy_kwargs=agent_policy_kwargs,
         pi_head_kwargs=agent_pi_head_kwargs,
     )
-    minerl_agent.load_weights(in_weights)
+    minerl_agent.load_weights(in_weights_policy)
 
     # Freeze most params if using small dataset
     for param in minerl_agent.policy.parameters():
@@ -62,7 +70,7 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         # Keep this at 1 since we are not keeping track of multiple hidden states
         n_envs=1,
         # This should be sufficiently high for the given task
-        max_episode_steps=20,
+        max_episode_steps=max_episode_steps,
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
 
@@ -72,11 +80,9 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
     # TODO reuse ImpalaCNN from the VPT models with a regression head
     image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
     reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
-    normalized_reward_net = NormalizedRewardNet(reward_net, RunningNorm)
-    preference_model = preference_comparisons.PreferenceModel(normalized_reward_net)
+    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
+    preference_model = preference_comparisons.PreferenceModel(reward_net)
 
-    # TODO design more useful fragmenter for MineRL trajcetories,
-    # e.g. only compare last parts of episodes
     fragmenter = preference_comparisons.MineRLFragmenter(warning_threshold=0, seed=0)
 
     gatherer = preference_comparisons.PrefCollectGatherer(
@@ -84,10 +90,8 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         video_output_dir="/home/aicrowd/pref-collect/videofiles/",
     )
 
-    # TODO imitation also provides EnsembleTrainer
-    # (which requires a RewardEnsemble), which trainer should we use?
     reward_trainer = preference_comparisons.BasicRewardTrainer(
-        model=normalized_reward_net,
+        model=reward_net,
         loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
         epochs=3,
     )
@@ -122,7 +126,8 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         fragmenter=fragmenter,
         preference_gatherer=gatherer,
         reward_trainer=reward_trainer,
-        fragment_length=10,
+        comparison_queue_size=2,
+        fragment_length=6,
         transition_oversampling=1,
         initial_comparison_frac=0.1,
         allow_variable_horizon=True,
@@ -138,9 +143,12 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     venv.close()
 
-    # Save finetuned weights
+    # Save finetuned policy weights
     state_dict = minerl_agent.policy.state_dict()
-    th.save(state_dict, out_weights)
+    th.save(state_dict, out_weights_policy)
+
+    # Save reward network
+    th.save(reward_net.state_dict(), out_weights_rewardnet)
 
     print("Finished")
 
@@ -157,23 +165,47 @@ if __name__ == "__main__":
     parser.add_argument(
         "--in-model",
         type=str,
-        help="Path to the .model file to be finetuned",
+        help="Path to the .model file of the policy to be finetuned",
         default="data/VPT-models/foundation-model-1x.model",
     )
     parser.add_argument(
-        "--in-weights",
+        "--in-weights-policy",
         type=str,
-        help="Path to the .weights file to be finetuned",
+        help="Path to the .weights file of the policy to be finetuned",
         default="data/VPT-models/foundation-model-1x.weights",
     )
     parser.add_argument(
-        "--out-weights",
+        "--out-weights-policy",
         type=str,
-        help="Path where finetuned weights will be saved",
+        help="Path where finetuned policy weights will be saved",
         default="train/PrefRLFinetuned.weights",
+    )
+    parser.add_argument(
+        "--in-weights-rewardnet",
+        type=str,
+        help="Path to the .weights file of the reward network",
+        default=None,
+    )
+    parser.add_argument(
+        "--out-weights-rewardnet",
+        type=str,
+        help="Path where reward network weights will be saved",
+        default="train/PrefRLRewardNet.weights",
+    )
+    parser.add_argument(
+        "--max-episode-steps",
+        type=str,
+        help="Maximum number of steps in each episode.",
+        default=10,
     )
 
     args = parser.parse_args()
     preference_based_RL_train(
-        args.env, args.in_model, args.in_weights, args.out_weights
+        args.env,
+        args.in_model,
+        args.in_weights_policy,
+        args.out_weights_policy,
+        args.in_weights_rewardnet,
+        args.out_weights_rewardnet,
+        args.max_episode_steps,
     )
