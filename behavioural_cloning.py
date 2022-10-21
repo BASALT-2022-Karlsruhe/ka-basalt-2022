@@ -4,49 +4,49 @@
 #       This will fit inside even smaller GPUs (tested on 8GB one),
 #       but is slow.
 
-from argparse import ArgumentParser
 import pickle
 import time
 
+import wandb
 import gym
 import minerl
 import torch as th
 import numpy as np
+import os
 
+from argparse import ArgumentParser
 from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 from utils.logs import Logging
-from utils.visualizer import visualize_loss
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = True
 
-EPOCHS = 1 if USING_FULL_DATASET else 2
+EPOCHS = int(os.getenv("EPOCHS", 1))
 # Needs to be <= number of videos
-BATCH_SIZE = 32 if USING_FULL_DATASET else 16
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 32))
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 50 if USING_FULL_DATASET else 20
+N_WORKERS = int(os.getenv("N_WORKERS", 50))
 DEVICE = "cuda"
 
 LOSS_REPORT_RATE = 100
 
 # Tuned with bit of trial and error
-LEARNING_RATE = 0.000181
+LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
-WEIGHT_DECAY = 0.0
+WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = 1.0
-MAX_GRAD_NORM = 5.0
+KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
 
-MAX_BATCHES = 2700 if USING_FULL_DATASET else int(1e9)
-# MAX_BATCHES = int(1e9)
+MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
 
 
 def load_model_parameters(path_to_model_file):
@@ -56,7 +56,19 @@ def load_model_parameters(path_to_model_file):
     pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
     return policy_kwargs, pi_head_kwargs
 
+
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
+
+    # save config
+    wandb.config.epochs = EPOCHS
+    wandb.config.batch_size = BATCH_SIZE
+    wandb.config.n_workers = N_WORKERS
+    wandb.config.learning_rate = LEARNING_RATE
+    wandb.config.weight_decay = WEIGHT_DECAY
+    wandb.config.kl_loss_weight = KL_LOSS_WEIGHT
+    wandb.config.max_grad_norm = MAX_GRAD_NORM
+    wandb.config.max_batches = MAX_BATCHES
+
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
     # To create model with the right environment.
@@ -162,6 +174,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         optimizer.zero_grad()
 
         loss_sum += batch_loss
+        
+        wandb.log({'loss': batch_loss})
+
         if batch_i % LOSS_REPORT_RATE == 0:
             time_since_start = time.time() - start_time
             Logging.info(f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}")

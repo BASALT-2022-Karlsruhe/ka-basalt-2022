@@ -19,6 +19,7 @@ services:
         git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
+      - 8000:8000
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_${DATA_ROOT}
@@ -36,7 +37,7 @@ services:
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
-  ka-basalt-2022-datadownloader_data_wombat:
+  ka-basalt-2022-datadownloader_data_wombat2:
     external: true
   models:
     name: ka-basalt-2022-models-${NAME}-${VERSION}
