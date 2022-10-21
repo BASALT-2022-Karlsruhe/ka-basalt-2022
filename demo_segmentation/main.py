@@ -3,6 +3,7 @@ import cv2
 import os
 from tqdm import tqdm
 import numpy as np
+import json
 
 # splits and saves segments based on keyframes
 def saveFiles(path, output_dir, filename, fps, frames, keyframes):
@@ -83,7 +84,7 @@ def SplitWaterfallDemo(path, output_dir, out_name):
         return
 
     # save files
-    saveFiles(path, output_dir, filename, fps, frames, [keyframe])
+    saveFiles(path, output_dir, out_name, fps, frames, [keyframe])
 
 # Split FindCave demos into 2 stages based on time. Last 10 seconds are approach, everything before is exploration.
 def SplitFindCaveDemo(path, output_dir, out_name):
@@ -126,31 +127,22 @@ def SplitFindCaveDemo(path, output_dir, out_name):
     #print(len(frames))
     keyframe = int(len(frames) - last_n_seconds*fps)
 
-    saveFiles(path, output_dir, filename, fps, frames, [keyframe])
+    saveFiles(path, output_dir, out_name, fps, frames, [keyframe])
 
 
 # Splits CreateVillageAnimalPen demos into 3 stages. prior to construction (find place and sometimes collect animals), construction, and bring animals to pen
 def SplitCreateVillageAnimalPenDemo(path, output_dir, out_name):
-    SplitInventoryChangeDemo(path, output_dir, out_name, slots=[0, 1], max_len=6000)
+    SplitInventoryChangeDemo([path], output_dir, out_name, slots=[0, 1], max_len=6000, pen_building=True)
 
 # Splits BuildVillageHouse demos into 3 stages. prior to construction (find place), construction, and house tour
 def SplitBuildVillageHouseDemo(path, output_dir, out_name):
-    SplitInventoryChangeDemo(path, output_dir, out_name, slots=[2,3,4,5,6,7,8,9], max_len=14400)
+    SplitInventoryChangeDemo(path, output_dir, out_name, slots=[2,3,4,5,6,7,8], max_len=14400)
 
 # Split demos into 3 stages based on inventory changes, slots defines which item slots to watch.
-def SplitInventoryChangeDemo(path, output_dir, out_name, slots=[0, 1], max_len=6000):
-    
-    # Path to video file
-    vidObj = cv2.VideoCapture(path)
-  
-    # get FPS
-    fps = vidObj.get(cv2.CAP_PROP_FPS)
+def SplitInventoryChangeDemo(paths, output_dir, out_name, slots=[0, 1], max_len=6000, pen_building=False):
 
     # Used as counter variable
     count = 0
-  
-    # checks whether frames were extracted
-    success = 1
 
     keyframe = -1
 
@@ -166,84 +158,137 @@ def SplitInventoryChangeDemo(path, output_dir, out_name, slots=[0, 1], max_len=6
     # timestamps of inventory changes
     changes = []
 
-    while success:
-  
-        # vidObj object calls read
-        # function extract frames
-        success, image = vidObj.read()
-        if not success:
-            break
+    diff_to_first = []
+    gate_built = False
 
-        frames.append(image)
-        count += 1
+    for path in paths:
+        # Path to video file
+        vidObj = cv2.VideoCapture(path)
 
-        if count < 10:
-            # skip first 10 frames (only in analysis)
-            continue
+        actions = [json.loads(x) for x in open(f"{path[:-4]}.jsonl",'r').readlines()]
+        linecount = -1
+        # get FPS
+        fps = vidObj.get(cv2.CAP_PROP_FPS)
+    
+        # checks whether frames were extracted
+        success = 1
+
+        craft = False
+        while success:
+    
+            # vidObj object calls read
+            # function extract frames
+            success, image = vidObj.read()
+            if not success:
+                break
+
+            frames.append(image)
+            count += 1
+            linecount += 1
+
+            if count < 10:
+                # skip first 10 frames (only in analysis)
+                continue
 
 
-        # detect and skip crafting menu
-        cv2.imwrite("frames/frame%d.jpg" % count, image)
-        if np.sum(np.abs(image[110:155,310:327, :].reshape((765,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[160:178,370:400,:].reshape((540,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[102:120,380:398,:].reshape((324,3)).mean(0) - np.array([197, 197, 197]))) < 5:
-            continue
+            # detect and skip crafting menu
+            #if np.sum(np.abs(image[110:155,310:327, :].reshape((765,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[160:178,370:400,:].reshape((540,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[102:120,380:398,:].reshape((324,3)).mean(0) - np.array([197, 197, 197]))) < 5:
+            #    craft = True
+            #    continue
 
-        # switch to black and white as we are only checking for changes in item numbers!
-        grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        (thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 220, 255, cv2.THRESH_BINARY)
+            if actions[min(linecount, len(actions)-1)]["isGuiOpen"]:
+                craft = True
+                continue
+
+            if craft:
+                craft = False
+                continue
+
+            # switch to black and white as we are only checking for changes in item numbers!
+            grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            (thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 220, 255, cv2.THRESH_BINARY)
 
 
-        if first is None:
-            # save first item config for each slot
-            first = []
-            for slot in slots:
-                first.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
-        else:
-            # calculate diff for each slot w.r.t. initial config
-            diff = 0
-            for i, slot in enumerate(slots):
-                diff += np.sum(np.abs(cv2.subtract(first[i], blackAndWhiteImage[350:357,237+20*slot:248+20*slot])))
-
-            # reset in case we are back to initial config (this is mainly to filter out noise)
-            if diff == 0 and keyframe != -1:
-                keyframe = -1
-
-            # check for change over initial config
-            if diff > 1000:
-                # change detected
-                if keyframe == -1:
-                    # log timestamp of change
-                    keyframe = count
-                    changes.append(count)
-
-                    # save new config               
-                    last = []
-                    for slot in slots:
-                        last.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
-                    
-                # get current config (this is done because the diff calculation cv2.subtract will change the image)
-                current = []
+            if first is None:
+                # save first item config for each slot
+                first = []
                 for slot in slots:
-                    current.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
-
-                # calculate diff with previous config
+                    first.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
+            else:
+                # calculate diff for each slot w.r.t. initial config
                 diff = 0
+                init_diff = []
                 for i, slot in enumerate(slots):
-                    diff += np.sum(np.abs(cv2.subtract(last[i], blackAndWhiteImage[350:357,237+20*slot:248+20*slot])))
+                    slot_diff = np.sum(np.abs(cv2.subtract(first[i], blackAndWhiteImage[350:357,237+20*slot:248+20*slot])))
+                    init_diff.append(slot_diff)
+                    diff += slot_diff
+                # reset in case we are back to initial config (this is mainly to filter out noise)
+                if diff == 0 and keyframe != -1:
+                    keyframe = -1
+                    changes = []
 
-                if diff > 1000:
-                    # next change detected
-                    # save config
-                    last = current
-                    # log timestamp for change
-                    changes.append(count)
+                # check for change over initial config
+                if diff > 200:
+                    # change detected
+                    if keyframe == -1:
+                        # log timestamp of change
+                        keyframe = count
+                        changes.append(count)
 
+                        # save new config               
+                        last = []
+                        for slot in slots:
+                            last.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
+                        
+                    # get current config (this is done because the diff calculation cv2.subtract will change the image)
+                    current = []
+                    for slot in slots:
+                        current.append(blackAndWhiteImage[350:357,237+20*slot:248+20*slot])
+
+                    # calculate diff with previous config
+                    diff = 0
+                    for i, slot in enumerate(slots):
+                        diff += np.sum(np.abs(cv2.subtract(last[i], blackAndWhiteImage[350:357,237+20*slot:248+20*slot])))
+
+                    if diff > 200:
+                        if pen_building:
+                            key_slot = 1
+                        else:
+                            key_slot = 3
+
+                        #cv2.imwrite("frames/frame%d.jpg" % count, blackAndWhiteImage[350:357,237+20*slots[key_slot]:248+20*slots[key_slot]])
+                        diff_to_first.append(init_diff[key_slot])
+                        if pen_building and init_diff[key_slot] != 0:
+                            if gate_built:
+                                return
+                            else:
+                                gate_built = True
+                        # next change detected
+                        # save config
+                        last = current
+                        # log timestamp for change
+                        changes.append(count)
 
     # abort if demo reaches maximum length or not enough changes were detected for segmentation
     if len(frames) >= max_len or len(changes) < 2:
         return
+    # abort if gate is not last build action
+    if pen_building and diff_to_first[-2] != 0:
+        return
+    else:
+        first_torch = 0
+        for i in range(len(diff_to_first)-10, len(diff_to_first)-2):
+            if diff_to_first[i:i+2] == [0, 0] and diff_to_first[i+2] != 0:
+                first_torch = i
+                break
+        if first_torch == 0:
+            return
+    #elif diff_to_first[-5] != 0:
+    #    return
+    changes = changes[:first_torch+4]
 
     # save files
-    saveFiles(path, output_dir, filename, fps, frames, [changes[0], changes[-1]])
+    saveFiles(paths[0], output_dir, out_name, fps, frames, [changes[0], changes[-1]])
 
   
 if __name__ == '__main__':
@@ -264,7 +309,21 @@ if __name__ == '__main__':
     # iterate over demos
     for path, method, out_path in queue:
         dir_list = os.listdir(path)
-        queue = [x for x in dir_list if x.endswith(".mp4")]
+        queue = sorted([x for x in dir_list if x.endswith(".mp4")])
 
-        for filename in tqdm(queue, desc="Splitting demos"):
-            method(f"{path}/{filename}", out_path, filename)
+        if method == SplitBuildVillageHouseDemo:
+            prev = ""
+            new_queue = []
+            for filename in queue:
+                prefix = "-".join(filename.split("-")[:-2])
+                if prefix == prev:
+                    new_queue[-1].append(filename)
+                else:
+                    new_queue.append([filename])
+                prev = prefix
+
+            for filenames in tqdm(new_queue, desc="Splitting demos"):
+                method([f"{path}/{filename}" for filename in filenames], out_path, filenames[0])
+        else:
+            for filename in tqdm(queue, desc="Splitting demos"):
+                method(f"{path}/{filename}", out_path, filename)
