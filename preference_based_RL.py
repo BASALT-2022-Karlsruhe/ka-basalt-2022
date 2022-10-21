@@ -2,10 +2,14 @@ from argparse import ArgumentParser
 import pickle
 
 import torch as th
+import numpy as np
 import gym
 from stable_baselines3 import PPO
 from imitation.algorithms import preference_comparisons
-from imitation.rewards.reward_nets import BasicRewardNet
+from imitation.rewards.reward_nets import (
+    CnnRewardNet,
+    NormalizedRewardNet,
+)
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
 import minerl  # noqa: F401
@@ -13,6 +17,7 @@ from openai_vpt.agent import MineRLAgent
 
 import sb3_minerl_envs  # noqa: F401
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
+from gym_wrappers import ObservationToInfos
 
 
 def load_model_parameters(path_to_model_file):
@@ -34,38 +39,55 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     minerl_agent = MineRLAgent(
         env,
-        device="cpu",  # "cuda" for GPU usage!
+        device="cuda",
         policy_kwargs=agent_policy_kwargs,
         pi_head_kwargs=agent_pi_head_kwargs,
     )
     minerl_agent.load_weights(in_weights)
 
+    # Freeze most params if using small dataset
+    for param in minerl_agent.policy.parameters():
+        param.requires_grad = False
+    # Unfreeze final layers and policy and value head
+    for param in minerl_agent.policy.net.lastlayer.parameters():
+        param.requires_grad = True
+    for param in minerl_agent.policy.pi_head.parameters():
+        param.requires_grad = True
+    for param in minerl_agent.policy.value_head.parameters():
+        param.requires_grad = True
+
     # Setup MineRL VecEnv
     venv = make_vec_env(
-        minerl_env_str + "SB3-v0", env_make_kwargs={"minerl_agent": minerl_agent}
+        minerl_env_str + "SB3-v0",
+        # Keep this at 1 since we are not keeping track of multiple hidden states
+        n_envs=1,
+        # This should be sufficiently high for the given task
+        max_episode_steps=20,
+        env_make_kwargs={"minerl_agent": minerl_agent},
     )
 
     # Setup preference-based reinforcement learning using the imitation package
     # TODO In general, check whether algorithm hyperparams make sense and tune
 
-    # TODO use a suitable reward model architecture,
-    # e.g. reuse ImpalaCNN from the VPT models with a regression head
-    reward_net = BasicRewardNet(
-        venv.observation_space, venv.action_space, normalize_input_layer=RunningNorm
-    )
-    preference_model = preference_comparisons.PreferenceModel(reward_net)
+    # TODO reuse ImpalaCNN from the VPT models with a regression head
+    image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
+    reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
+    normalized_reward_net = NormalizedRewardNet(reward_net, RunningNorm)
+    preference_model = preference_comparisons.PreferenceModel(normalized_reward_net)
 
     # TODO design more useful fragmenter for MineRL trajcetories,
     # e.g. only compare last parts of episodes
-    fragmenter = preference_comparisons.RandomFragmenter(warning_threshold=0, seed=0)
+    fragmenter = preference_comparisons.MineRLFragmenter(warning_threshold=0, seed=0)
 
-    # TODO design gatherer that obtains preferences from web interface
-    gatherer = preference_comparisons.SyntheticGatherer(seed=0)
+    gatherer = preference_comparisons.PrefCollectGatherer(
+        pref_collect_address="http://127.0.0.1:8000",
+        video_output_dir="/home/aicrowd/pref-collect/videofiles/",
+    )
 
     # TODO imitation also provides EnsembleTrainer
     # (which requires a RewardEnsemble), which trainer should we use?
     reward_trainer = preference_comparisons.BasicRewardTrainer(
-        model=reward_net,
+        model=normalized_reward_net,
         loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
         epochs=3,
     )
@@ -78,14 +100,14 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
         },
         env=venv,
         seed=0,
-        n_steps=2048 // venv.num_envs,
-        batch_size=64,
+        n_steps=512 // venv.num_envs,
+        batch_size=32,
         ent_coef=0.0,
         learning_rate=0.0003,
         n_epochs=10,
     )
 
-    trajectory_generator = preference_comparisons.AgentTrainer(
+    trajectory_generator = preference_comparisons.MineRLAgentTrainer(
         algorithm=agent,
         reward_fn=reward_net,
         venv=venv,
@@ -110,8 +132,8 @@ def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
 
     # Run training
     pref_comparisons.train(
-        total_timesteps=5_000,  # For good performance this should be 1_000_000
-        total_comparisons=200,  # For good performance this should be 5_000
+        total_timesteps=500,  # For good performance this should be 1_000_000
+        total_comparisons=10,  # For good performance this should be 5_000
     )
 
     venv.close()
