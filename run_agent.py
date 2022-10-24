@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import pickle
+import queue
 
 import aicrowd_gym
 import minerl
@@ -7,8 +8,12 @@ import minerl
 from gym.wrappers import Monitor
 
 from openai_vpt.agent import MineRLAgent
+from find_cave_classifier import FindCaveCNN, preprocessing
 
-def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=False, record=False, video_dir="./video"):
+ESC_MODELS = {"MineRLBasaltFindCave": FindCaveCNN}
+
+
+def main(model, weights, esc_model_path, env, n_episodes=3, max_steps=int(1e9), show=False, record=False, video_dir="./video"):
     # Using aicrowd_gym is important! Your submission will not work otherwise
     env = aicrowd_gym.make(env)
 
@@ -25,15 +30,25 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=False, reco
     agent = MineRLAgent(env, policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs)
     agent.load_weights(weights)
 
+    esc_model = ESC_MODELS[env]()
+    esc_model.load_state_dict(esc_model_path)
+
     for _ in range(n_episodes):
         obs = env.reset()
         n_steps = 0
+
+        obs_queue = queue.Queue(maxsize=4)
         while True:
+            obs_queue.put(preprocessing(obs["pov"]))
             action = agent.get_action(obs)
-            # ESC is not part of the predictions model.
-            # For baselines, we just set it to zero.
-            # We leave proper execution as an exercise for the participants :)
-            action["ESC"] = 0
+
+            if n_steps < 4:
+                action["ESC"] = 0
+            else:
+                obs_stack = th.from_numpy(np.array(list(obs_queue)))
+                esc_action = esc_model.predict(obs_stack)
+                action["ESC"] = esc_action
+
             obs, _, done, _ = env.step(action)
             if show:
                 if n_steps % 10 == 0:
