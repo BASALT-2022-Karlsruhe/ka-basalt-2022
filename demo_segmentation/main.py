@@ -7,6 +7,9 @@ import json
 
 # splits and saves segments based on keyframes
 def saveFiles(path, output_dir, filename, fps, frames, keyframes):
+    if not frames:
+        print("Empty frame - return.")
+        return
 
     # check for and create dirs
     for i in range(len(keyframes)+1):
@@ -21,7 +24,14 @@ def saveFiles(path, output_dir, filename, fps, frames, keyframes):
             continue
 
         # write video
+ 
+        try:
+            (frames[0].shape[1], frames[0].shape[0])
+        except:
+            print("error: frames", frames)
+        
         video_out = cv2.VideoWriter(f"{output_dir}/stage_{i}/{filename}", cv2.VideoWriter_fourcc(*'mp4v'), fps, (frames[0].shape[1], frames[0].shape[0]), 1)
+            
         for frame in frames[keyframes[i-1]:keyframes[i]]:
             video_out.write(frame)
 
@@ -300,11 +310,8 @@ if __name__ == '__main__':
     
     # queue item format (path_to_demos, splitting_method, target_path_for_segments)
     queue = [
-        ("demos/MineRLBasaltMakeWaterfall-v0/", SplitWaterfallDemo, "segments/MakeWaterfall/"),
-        ("demos/MineRLBasaltFindCave-v0/", SplitFindCaveDemo, "segments/FindCave/"),
-        ("demos/MineRLBasaltCreateVillageAnimalPen-v0/", SplitCreateVillageAnimalPenDemo, "segments/CreateVillageAnimalPen/"),
-        ("demos/MineRLBasaltBuildVillageHouse-v0/", SplitBuildVillageHouseDemo, "segments/BuildVillageHouse/"),
-        ]
+        ("/home/aicrowd/data/MineRLBasaltFindCave-v0/", SplitFindCaveDemo, "/home/aicrowd/data/segments/FindCave/") 
+    ]
 
     # iterate over demos
     for path, method, out_path in queue:
