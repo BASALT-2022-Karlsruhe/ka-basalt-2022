@@ -52,6 +52,10 @@ def saveFiles(path, output_dir, filename, fps, frames, keyframes):
 # Split MakeWaterfall demos into 2 stages based on when the bucket is emptied
 def SplitWaterfallDemo(path, output_dir, out_name):
 
+    # Don't process video twice -> need to delete output if want to regenerate
+    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+        return
+
     # Path to video file
     vidObj = cv2.VideoCapture(path)
 
@@ -108,6 +112,10 @@ def SplitWaterfallDemo(path, output_dir, out_name):
 # Split FindCave demos into 2 stages based on time. Last 10 seconds are approach, everything before is exploration.
 def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
 
+    # Don't process video twice -> need to delete output if want to regenerate
+    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+        return
+
     last_n_seconds = 2
     darkness_mean_threshold = 40
     darkness_var_threshold = 250
@@ -151,7 +159,7 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
             running_mean += 1 / window * (mean - running_mean)
             #print(
             #    f"Grey frame {count}: ema {running_mean:.2f}, mean {mean:.2f}, var {var:.2f}",
-            )
+            #)
             if running_mean < darkness_mean_threshold or (
                 mean < darkness_mean_threshold and var < darkness_var_threshold
             ):
@@ -167,12 +175,15 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
     if not darkness or keyframe < 0:
         keyframe = int(len(frames) - last_n_seconds * fps)
 
-    seconds_from_start = keyframe / fps
-    seconds_from_end = len(frames) / fps - seconds_from_start
-    frames_from_end = len(frames) - keyframe
-    print(
-        f"Splitting {path} at frame {keyframe} = {frames_from_end} frames from end = {seconds_from_start:.2f} s from start = {seconds_from_end:.2f} s from end"
-    )
+    if len(frames) == 0 and fps == 0:
+        print(f"Empty video: {out_name}")
+
+    #seconds_from_start = keyframe / fps
+    #seconds_from_end = len(frames) / fps - seconds_from_start
+    #frames_from_end = len(frames) - keyframe
+    #print(
+    #    f"Splitting {path} at frame {keyframe} = {frames_from_end} frames from end = {seconds_from_start:.2f} s from start = {seconds_from_end:.2f} s from end"
+    #)
 
     if plot:
         plt.figure()
@@ -194,6 +205,11 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
 
 # Splits CreateVillageAnimalPen demos into 3 stages. prior to construction (find place and sometimes collect animals), construction, and bring animals to pen
 def SplitCreateVillageAnimalPenDemo(path, output_dir, out_name):
+
+    # Don't process video twice -> need to delete output if want to regenerate
+    if os.path.exists(f"{output_dir}/stage_3/{out_name}") and os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+        return
+
     SplitInventoryChangeDemo(
         [path], output_dir, out_name, slots=[0, 1], max_len=6000, pen_building=True
     )
@@ -201,6 +217,12 @@ def SplitCreateVillageAnimalPenDemo(path, output_dir, out_name):
 
 # Splits BuildVillageHouse demos into 3 stages. prior to construction (find place), construction, and house tour
 def SplitBuildVillageHouseDemo(path, output_dir, out_name):
+
+    # Don't process video twice -> need to delete output if want to regenerate
+    if os.path.exists(f"{output_dir}/stage_3/{out_name}") and os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+        return
+
+
     SplitInventoryChangeDemo(
         path, output_dir, out_name, slots=[2, 3, 4, 5, 6, 7, 8], max_len=14400
     )
@@ -402,7 +424,7 @@ if __name__ == "__main__":
         (
             "/home/aicrowd/data/segments/FindCave/stage_2",
             SplitFindCaveDemo,
-            "/home/aicrowd/data/segments/FindCave2",
+            "/home/aicrowd/data/segments/FindCaveBrightness",
         )
     ]
 
