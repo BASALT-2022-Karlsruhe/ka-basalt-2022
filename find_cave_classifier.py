@@ -14,20 +14,23 @@ from openai_vpt.agent import resize_image, AGENT_RESOLUTION
 
 LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
-STACK_SIZE = 4
+STACK_SIZE = 1
 
 
 class FindCaveCNN(nn.Module):
     def __init__(self):
         super().__init__()
-        features_dim = 1
+        features_dim = 2
         n_input_channels = STACK_SIZE
+        first_conv_out_channels =  32
+        second_conv_out_channels = 64
+        third_conv_out_channels =  64
         self.cnn = nn.Sequential(
-            nn.Conv2d(n_input_channels, 32, kernel_size=8, stride=4, padding=0),
+            nn.Conv2d(n_input_channels, first_conv_out_channels, kernel_size=8, stride=4, padding=0),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
+            nn.Conv2d(first_conv_out_channels, second_conv_out_channels, kernel_size=4, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0),
+            nn.Conv2d(second_conv_out_channels, third_conv_out_channels, kernel_size=3, stride=1, padding=0),
             nn.ReLU(),
             nn.Flatten(),
         )
@@ -43,7 +46,8 @@ class FindCaveCNN(nn.Module):
         return self.linear(self.cnn(observations))
 
     def predict(self, observations):
-        return self.forward(observation) > 0.
+        return self.forward(observation).argmax(dim=1)
+        #return self.forward(observation) > 0.
 
 
 def preprocessing(img):
@@ -67,7 +71,7 @@ def process_video(video_path):
         success, img = video_object.read()
         if  success and img is not None:
             processed_img = preprocessing(img)
-            current_stack[count % 4, :, :] = processed_img
+            current_stack[count % STACK_SIZE, :, :] = processed_img
             count += 1
             if count % STACK_SIZE == 0:
                 img_stacks.append(current_stack)
@@ -138,6 +142,8 @@ class FindCaveImageDataset(Dataset):
 
             for del_idx in sorted(delete_idxs, reverse=True):
                 del self.stack_labels[del_idx], self.stack_files[del_idx]
+
+        self.labels_onehot = th.tensor([[1, 0], [0, 1]])
                     
 
     def __len__(self):
@@ -146,7 +152,7 @@ class FindCaveImageDataset(Dataset):
     def __getitem__(self, stack_idx):
         np_stack = np.load(os.path.join(self.stack_dir, self.stack_files[stack_idx]))
         stack = th.from_numpy(np_stack).float()
-        label = th.tensor(self.stack_labels[stack_idx]).float()
+        label = self.labels_onehot[self.stack_labels[stack_idx]].float()
         return stack, label
 
 
@@ -159,12 +165,12 @@ def create_dataset(video_dir_cave, video_dir_expl, stack_dir):
         convert_videos_to_stacks(video_dir_expl, stack_dir, 0, stack_idx=stack_idx)
 
 
-def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
+def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5, report_rate=1000):
     os.makedirs(model_dir, exist_ok=True)
 
     # hyperparameters
     num_epochs = 1
-    batch_size = 16
+    batch_size = 64
     lr = 0.001
 
     # only use fraction of the dataset
@@ -194,7 +200,7 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
     # create model, optimizer, loss function
     model = FindCaveCNN().to(DEVICE)
     optimizer = th.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = nn.CrossEntropyLoss() # nn.BCEWithLogitsLoss()
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     best_vloss = 1_000_000.
@@ -205,13 +211,14 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
 
         model.train(True)
         running_loss = last_loss = 0
+        last_accuracy = 0.0
         correct = 0
         for i, (stacks, labels) in enumerate(tqdm(training_loader)):
             stacks, labels = stacks.to(DEVICE), labels.to(DEVICE)
 
             optimizer.zero_grad()
             # Calculate loss
-            logit_pred = model(stacks).squeeze()
+            logit_pred = model(stacks)#.squeeze()
             loss = loss_fn(logit_pred, labels)
 
             # Backprop
@@ -220,16 +227,19 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
             
             with th.no_grad():
                 # Calculate accuracy
-                pred = (logit_pred.sigmoid() > 0).long()
-                correct += (pred == labels).float().sum()
+                pred = logit_pred.argmax(dim=1).long()#(logit_pred.sigmoid() > 0).long()
+                digit_labels = labels.argmax(dim=1).long()
+                #print("logit_pred size:", logit_pred.size())
+                #print("pred size:", pred.size())
+                correct += (pred == digit_labels).float().sum()
 
             del stacks, labels
             th.cuda.empty_cache()
 
             running_loss += loss.item()
-            if i % 1000 == 999:
-                last_loss = running_loss / 1000
-                last_accuracy = 100 * correct / (1000 * batch_size)
+            if i % report_rate == report_rate - 1:
+                last_loss = running_loss / report_rate
+                last_accuracy = 100 * correct / (report_rate * batch_size)
                 tqdm.write("Batch: {}, Loss: {:.4f}, Accuracy: {:.2f}".format(i + 1, last_loss, last_accuracy))
                 running_loss = 0
                 correct = 0
@@ -242,15 +252,16 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
                 vstacks, vlabels = vstacks.to(DEVICE), vlabels.to(DEVICE)
 
                 # Calculate loss
-                vlogit_pred = model(vstacks).squeeze()
-                if vlogit_pred.size() == th.Size([]):
-                    vlogit_pred = vlogit_pred.unsqueeze(0)
+                vlogit_pred = model(vstacks)#.squeeze()
+                #if vlogit_pred.size() == th.Size([]):
+                #    vlogit_pred = vlogit_pred.unsqueeze(0)
                 vloss = loss_fn(vlogit_pred, vlabels)
                 running_vloss += vloss
 
                 # Calculate accuracy
-                vpred = (vlogit_pred.sigmoid() > 0).long()
-                vcorrect += (vpred == vlabels).float().sum()
+                vpred = vlogit_pred.argmax(dim=1).long() # (vlogit_pred.sigmoid() > 0).long()
+                vdigit_labels = vlabels.argmax(dim=1).long()
+                vcorrect += (vpred == vdigit_labels).float().sum()
 
                 del vstacks, vlabels
                 th.cuda.empty_cache()
@@ -273,19 +284,20 @@ if __name__ == "__main__":
     Logging.info("Start creating dataset")
 
     create_dataset(
-        video_dir_cave="/home/aicrowd/data/segments/FindCave/stage_2",
-        video_dir_expl="/home/aicrowd/data/segments/FindCave/stage_1",
-        stack_dir="/home/aicrowd/data/segments/FindCave/stacks",
+        video_dir_cave="/home/aicrowd/data/segments/FindCaveBrightness/stage_2",
+        video_dir_expl="/home/aicrowd/data/segments/FindCaveBrightness/stage_1",
+        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/images",
     )
 
     Logging.info("Finished creating dataset")
     Logging.info("Start training")
 
     train(
-        stack_dir="/home/aicrowd/data/segments/FindCave/stacks",
+        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/images",
         model_dir="/home/aicrowd/train",
-        data_frac=0.01, # fraction of data to be used
+        data_frac=1., # fraction of data to be used
         validation_frac=0.2, # fraction of loaded data to be used for validation
+        report_rate=1,
     )
 
     Logging.info("Finished training")
