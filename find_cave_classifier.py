@@ -11,6 +11,7 @@ import cv2
 from utils import create_subfolders
 from utils.logs import Logging
 from openai_vpt.agent import resize_image, AGENT_RESOLUTION
+from impala_based_models import ImpalaBinaryClassifier
 
 LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -50,32 +51,40 @@ class FindCaveCNN(nn.Module):
         #return self.forward(observation) > 0.
 
 
-def preprocessing(img):
+def preprocessing(img, greyscale=False, norm=False):
     try:
-        resized_img = resize_image(img, AGENT_RESOLUTION)
+        img = resize_image(img, AGENT_RESOLUTION)
     except Exception as e:
         print(str(e))
-    greyscale_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
-    # scale pixel values to [-1, 1]
-    normed_greyscale_resized_img = 2 * (greyscale_img / 255.) - 1
-    return normed_greyscale_resized_img
+    if greyscale:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if norm:
+        # scale pixel values to [-1, 1]
+        img = 2 * (img / 255.) - 1
+    return img
 
 
-def process_video(video_path):
+def process_video(video_path, rgb_images=True):
     video_object = cv2.VideoCapture(video_path)
     img_stacks = []
-    current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION))
+    if rgb_images:
+        current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION, 3))
+    else:
+        current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION))
     count = 0
     success = True
     while success:
         success, img = video_object.read()
         if  success and img is not None:
             processed_img = preprocessing(img)
-            current_stack[count % STACK_SIZE, :, :] = processed_img
+            current_stack[count % STACK_SIZE, ...] = processed_img
             count += 1
             if count % STACK_SIZE == 0:
                 img_stacks.append(current_stack)
-                current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION))
+                if rgb_images:
+                    current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION, 3))
+                else:
+                    current_stack = np.empty((STACK_SIZE, *AGENT_RESOLUTION))
     return img_stacks
 
 
@@ -85,13 +94,15 @@ def count_stacks(video_path):
     return frame_count // STACK_SIZE
 
 
-def convert_videos_to_stacks(video_dir, stack_dir, label, stack_idx=0):
+def convert_videos_to_stacks(video_dir, stack_dir, label, stack_idx=0, squeeze=True):
     for file in tqdm(os.listdir(video_dir)):
         filename = os.fsdecode(file)
         if filename.endswith(".mp4"):
             img_stacks = process_video(os.path.join(video_dir, filename))
             for img_stack in img_stacks:
                 save_path = os.path.join(stack_dir, f"{label}_{stack_idx}.npy")
+                if squeeze:
+                    img_stack = img_stack.squeeze()
                 np.save(save_path, img_stack)
                 stack_idx += 1
     return stack_idx
@@ -165,7 +176,14 @@ def create_dataset(video_dir_cave, video_dir_expl, stack_dir):
         convert_videos_to_stacks(video_dir_expl, stack_dir, 0, stack_idx=stack_idx)
 
 
-def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5, report_rate=1000):
+def train(
+        stack_dir,
+        model_dir,
+        model_name="impala",
+        data_frac=0.05,
+        validation_frac=0.5,
+        report_rate=1000
+    ):
     os.makedirs(model_dir, exist_ok=True)
 
     # hyperparameters
@@ -198,7 +216,12 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5, report_rate
     validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
     # create model, optimizer, loss function
-    model = FindCaveCNN().to(DEVICE)
+    if model_name.lower() == "impala":
+        # TODO parameterize model_width
+        model = ImpalaBinaryClassifier().to(DEVICE)
+    elif model_name.lower() == "naturecnn":
+        model = FindCaveCNN().to(DEVICE)
+
     optimizer = th.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss() # nn.BCEWithLogitsLoss()
 
@@ -286,16 +309,17 @@ if __name__ == "__main__":
     create_dataset(
         video_dir_cave="/home/aicrowd/data/segments/FindCaveBrightness/stage_2",
         video_dir_expl="/home/aicrowd/data/segments/FindCaveBrightness/stage_1",
-        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/images",
+        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
     )
 
     Logging.info("Finished creating dataset")
     Logging.info("Start training")
 
     train(
-        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/images",
+        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
         model_dir="/home/aicrowd/train",
-        data_frac=1., # fraction of data to be used
+        model_name="impala", # either "impala" or "naturecnn"
+        data_frac=0.1, # fraction of data to be used
         validation_frac=0.2, # fraction of loaded data to be used for validation
         report_rate=1,
     )
