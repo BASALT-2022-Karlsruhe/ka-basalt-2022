@@ -157,9 +157,9 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
             means.append(mean)
             vars.append(var)
             running_mean += 1 / window * (mean - running_mean)
-            #print(
-            #    f"Grey frame {count}: ema {running_mean:.2f}, mean {mean:.2f}, var {var:.2f}",
-            #)
+            # print(
+            #     f"Grey frame {count}: ema {running_mean:.2f}, mean {mean:.2f}, var {var:.2f}",
+            # )
             if running_mean < darkness_mean_threshold or (
                 mean < darkness_mean_threshold and var < darkness_var_threshold
             ):
