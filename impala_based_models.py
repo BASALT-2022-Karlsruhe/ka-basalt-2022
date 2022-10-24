@@ -1,12 +1,15 @@
+import os
+
 import torch as th
 import torch.nn as nn
 from openai_vpt.lib.impala_cnn import ImpalaCNN
+from openai_vpt.lib.policy import ImgPreprocessing
 from openai_vpt.lib.util import FanInInitReLULayer
+from openai_vpt.agent import MineRLAgent
 from typing import Dict
 
 import gym
 from behavioural_cloning import load_model_parameters
-from openai_vpt.agent import MineRLAgent
 
 
 class ImpalaLinear(nn.Module):
@@ -20,63 +23,81 @@ class ImpalaLinear(nn.Module):
 
     def __init__(
         self,
-        cnn_outsize: int,
         output_size: int,
-        dense_init_norm_kwargs: Dict = {},
-        init_norm_kwargs: Dict = {},
-        **kwargs,
+        cnn_outsize: int = 256,
+        cnn_width: int = 1,
     ):
         super().__init__()
+
+        if cnn_width == 1:
+            chans=(64, 128, 128)
+        elif cnn_width == 2:
+            chans=(128, 256, 256)
+        elif cnn_width == 3:
+            chans=(192, 384, 384)
+        else:
+            raise ValueError(f"There is no VPT model with width {model_width}!")
+        self.cnn_width = cnn_width
+
+        self.img_preprocess = ImgPreprocessing(img_statistics=None, scale_img=True)
         self.cnn = ImpalaCNN(
-            outsize=cnn_outsize,
-            init_norm_kwargs=init_norm_kwargs,
-            dense_init_norm_kwargs=dense_init_norm_kwargs,
-            **kwargs,
+            inshape=[128, 128, 3],
+            chans=chans,
+            outsize=256,
+            nblock=2,
+            first_conv_norm=False,
+            post_pool_groups=1,
+            dense_init_norm_kwargs={"batch_norm": False, "layer_norm": True},
+            init_norm_kwargs={"batch_norm": False, "group_norm_groups": 1},
         )
         self.linear = FanInInitReLULayer(
             cnn_outsize,
             output_size,
             layer_type="linear",
-            **dense_init_norm_kwargs,
+            **{"batch_norm": False, "layer_norm": True},
         )
 
     def forward(self, img):
-        return self.linear(self.cnn(img))
+        # Need to add fictitious time-dimension
+        if len(img.shape[:-3]) < 2:
+            img = img.unsqueeze(1)
+        return self.linear(self.cnn(self.img_preprocess(img)))
 
-    def load_cnn_weights(self, path="data/VPT-models/ImpalaCNN-1x.weights"):
-        self.cnn.load_state_dict(th.load(path))
+    def load_cnn_weights(self, model_path="data/VPT-models"):
+        self.cnn.load_state_dict(th.load(os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights")))
 
 
-class ImpalaClassifier(nn.Module):
+class ImpalaBinaryClassifier(nn.Module):
     """Classification network based on ImpalaCNN"""
 
-    def __init__(self, output_size, cnn_outsize=256, hidden_size=512):
+    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models"):
         super().__init__()
-        self.impala_linear = ImpalaLinear(cnn_outsize, hidden_size)
-        self.output_layer = nn.Linear(hidden_size, output_size)
+        self.impala_linear = ImpalaLinear(2, cnn_outsize, cnn_width)
+        self.impala_linear.load_cnn_weights(model_path)
 
     def forward(self, obs):
-        return self.output_layer(nn.functional.ReLU(self.impala_linear(obs)))
+        return self.impala_linear(obs)
 
 
 class ImpalaRewardModel(nn.Module):
     """Reward model based on ImpalaCNN"""
 
-    def __init__(self, cnn_outsize=256, hidden_size=512):
+    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models"):
         super().__init__()
-        self.impala_linear = ImpalaLinear(cnn_outsize, hidden_size)
-        self.normalized_reward_layer = nn.Linear(hidden_size, 1)
+        self.impala_linear = ImpalaLinear(cnn_outsize, 1, cnn_width)
+        self.impala_linear.load_cnn_weights(model_path)
+        # TODO normalizing layer
+        #self.normalized_reward_layer = nn.Linear(hidden_size, 1)
 
     def forward(self, obs):
-        return self.normalized_reward_layer(nn.functional.ReLU(self.impala_linear(obs)))
+        return self.impala_linear(obs)
 
 
 def save_impala_cnn_weights(model_width=1):
     """
     Saves ImpalaCNN weights.
 
-    TODO check whether ImpalaCNN even depends on model_width ...
-    model_width in [1, 2, 3] according to the three VPT model sizes
+    `model_width in [1, 2, 3]` according to the three VPT model sizes
     """
     # Setup a MineRL environment
     minerl_env_str = "MineRLBasaltFindCave"
@@ -106,13 +127,22 @@ def load_impala_cnn_weights(
 ):
     """Load previously saved"""
 
+    if model_width == 1:
+        chans=(64, 128, 128)
+    elif model_width == 2:
+        chans=(128, 256, 256)
+    elif model_width == 3:
+        chans=(192, 384, 384)
+    else:
+        raise ValueError(f"There is no VPT model with width {model_width}!")
+
     # Load state dict
     state_dict = th.load(f"data/VPT-models/ImpalaCNN-{model_width}x.weights")
 
     # Create model object
     impala_cnn = ImpalaCNN(
         inshape=[128, 128, 3],
-        chans=(64, 128, 128),
+        chans=chans,
         outsize=256,
         nblock=2,
         first_conv_norm=False,
