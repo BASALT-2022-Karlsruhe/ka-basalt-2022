@@ -11,14 +11,14 @@ from utils.logs import Logging
 from utils.create_videos import create_videos
 
 
-FOUNDATION_MODEL = "foundation-model-2x"
+FOUNDATION_MODEL = "foundation-model-1x"
 
 BC_TRAINING = True
 PREFRL_TRAINING = False
 
 ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
 
-ESC_MODELS = ["FindCaveCNN_20221024_235019_epoch5"]
+ESC_MODELS = []
 NUM_VIDEOS = 5
 NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
 
