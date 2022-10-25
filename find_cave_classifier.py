@@ -16,6 +16,7 @@ from impala_based_models import ImpalaBinaryClassifier
 LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
 STACK_SIZE = 1
+TRAIN = False
 
 
 class FindCaveCNN(nn.Module):
@@ -164,6 +165,7 @@ class FindCaveImageDataset(Dataset):
         np_stack = np.load(os.path.join(self.stack_dir, self.stack_files[stack_idx]))
         stack = th.from_numpy(np_stack).float()
         label = self.labels_onehot[self.stack_labels[stack_idx]].float()
+        #label = th.tensor(self.stack_labels[stack_idx])
         return stack, label
 
 
@@ -187,9 +189,10 @@ def train(
     os.makedirs(model_dir, exist_ok=True)
 
     # hyperparameters
-    num_epochs = 1
-    batch_size = 64
-    lr = 0.001
+    balance_classes = False
+    num_epochs = 10
+    batch_size = 16
+    lr = 0.0001
 
     # only use fraction of the dataset
     if os.path.exists(stack_dir) and len(os.listdir(stack_dir)) > 0:
@@ -198,7 +201,7 @@ def train(
         raise ValueError(f"No data found at location {stack_dir}")
     num_stacks = int(num_stacks * data_frac)
 
-    dataset = FindCaveImageDataset(stack_dir, num_stacks)
+    dataset = FindCaveImageDataset(stack_dir, num_stacks, balance_classes=True)
 
     # actual numbers after creating dataset (could be different due to balancing)
     num_validation_stacks = int(dataset.num_stacks * validation_frac)
@@ -207,9 +210,9 @@ def train(
 
     # split into train and validation sets
     training_dataset, validation_dataset = random_split(
-        dataset,
-        [num_training_stacks, num_validation_stacks],
-        generator=th.Generator().manual_seed(42),
+       dataset,
+       [num_training_stacks, num_validation_stacks],
+       generator=th.Generator().manual_seed(42),
     )
 
     training_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
@@ -242,6 +245,8 @@ def train(
             optimizer.zero_grad()
             # Calculate loss
             logit_pred = model(stacks)#.squeeze()
+            # print("logit_pred size:", logit_pred.size())
+            # print("labels size:", labels.size())
             loss = loss_fn(logit_pred, labels)
 
             # Backprop
@@ -252,7 +257,6 @@ def train(
                 # Calculate accuracy
                 pred = logit_pred.argmax(dim=1).long()#(logit_pred.sigmoid() > 0).long()
                 digit_labels = labels.argmax(dim=1).long()
-                #print("logit_pred size:", logit_pred.size())
                 #print("pred size:", pred.size())
                 correct += (pred == digit_labels).float().sum()
 
@@ -269,7 +273,7 @@ def train(
         model.train(False)
 
         with th.no_grad():
-            running_vloss = last_accuracy = 0.0
+            running_vloss = 0.0
             vcorrect = 0
             for i, (vstacks, vlabels) in enumerate(tqdm(validation_loader)):
                 vstacks, vlabels = vstacks.to(DEVICE), vlabels.to(DEVICE)
@@ -301,6 +305,80 @@ def train(
         th.save(model.state_dict(), model_path)
 
 
+def test(stack_dir, model_path, model_name, data_frac=1.):
+
+    # load model
+    if model_name.lower() == "impala":
+        # TODO parameterize model_width
+        model = ImpalaBinaryClassifier()
+    elif model_name.lower() == "naturecnn":
+        model = FindCaveCNN()
+    model.load_state_dict(th.load(model_path))
+    model.to(DEVICE)
+
+    loss_fn = nn.CrossEntropyLoss() # nn.BCEWithLogitsLoss()
+
+    # hyperparameters
+    balance_classes = False
+    batch_size = 16
+    num_splits = 10
+
+    # only use fraction of the dataset
+    if os.path.exists(stack_dir) and len(os.listdir(stack_dir)) > 0:
+        num_stacks = len(os.listdir(stack_dir))
+    else:
+        raise ValueError(f"No data found at location {stack_dir}")
+    num_stacks = int(num_stacks * data_frac)
+
+    dataset = FindCaveImageDataset(stack_dir, num_stacks, balance_classes=True)
+
+    # actual numbers after creating dataset (could be different due to balancing)
+    num_stacks_per_split, num_stacks_remaining = divmod(dataset.num_stacks, num_splits)
+    Logging.info(f"#stacks: {dataset.num_stacks} / #splits: {num_splits} = {num_stacks_per_split}")
+    dataset_sizes = (num_splits - 1) * [num_stacks_per_split] + [num_stacks_per_split + num_stacks_remaining]
+    print(dataset_sizes)
+    print(sum(dataset_sizes))
+
+    # split into train and validation sets
+    dataset_splits = random_split(
+       dataset,
+       dataset_sizes,
+       generator=th.Generator().manual_seed(42),
+    )
+
+    for split_idx, validation_dataset in enumerate(dataset_splits):
+
+        Logging.info(f"Split {split_idx + 1}")
+
+        validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
+
+        with th.no_grad():
+            running_vloss = 0.0
+            vcorrect = 0
+            for i, (vstacks, vlabels) in enumerate(tqdm(validation_loader)):
+                vstacks, vlabels = vstacks.to(DEVICE), vlabels.to(DEVICE)
+
+                # Calculate loss
+                vlogit_pred = model(vstacks)#.squeeze()
+                #if vlogit_pred.size() == th.Size([]):
+                #    vlogit_pred = vlogit_pred.unsqueeze(0)
+                vloss = loss_fn(vlogit_pred, vlabels)
+                running_vloss += vloss
+
+                # Calculate accuracy
+                vpred = vlogit_pred.argmax(dim=1).long() # (vlogit_pred.sigmoid() > 0).long()
+                vdigit_labels = vlabels.argmax(dim=1).long()
+                vcorrect += (vpred == vdigit_labels).float().sum()
+
+                del vstacks, vlabels
+                th.cuda.empty_cache()
+            avg_vloss = running_vloss / (i + 1)
+            avg_accuracy = 100 * vcorrect / len(validation_dataset)
+
+            Logging.info('Valid loss: {:.4f}, accuracy: {:.2f}%'.format(avg_vloss, avg_accuracy))
+
+
+
 if __name__ == "__main__":
     create_subfolders.main()
     Logging.setup(name=LOG_FILE)
@@ -313,15 +391,26 @@ if __name__ == "__main__":
     )
 
     Logging.info("Finished creating dataset")
-    Logging.info("Start training")
+    if TRAIN:
+        Logging.info("Start training")
 
-    train(
-        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
-        model_dir="/home/aicrowd/train",
-        model_name="impala", # either "impala" or "naturecnn"
-        data_frac=0.1, # fraction of data to be used
-        validation_frac=0.2, # fraction of loaded data to be used for validation
-        report_rate=1,
-    )
+        train(
+            stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
+            model_dir="/home/aicrowd/train",
+            model_name="impala", # either "impala" or "naturecnn"
+            data_frac=1., # fraction of data to be used
+            validation_frac=0.1, # fraction of loaded data to be used for validation
+            report_rate=1000,
+        )
 
-    Logging.info("Finished training")
+        Logging.info("Finished training")
+    else:
+        Logging.info("Start validation")
+
+        test(stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
+            model_path="/home/aicrowd/train/FindCaveCNN_20221024_235019_epoch5.weights",
+            model_name="impala",
+            data_frac=0.1
+        )
+        
+        Logging.info("Finished validation")

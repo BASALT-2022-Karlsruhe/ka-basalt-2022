@@ -58,10 +58,13 @@ class ImpalaLinear(nn.Module):
         )
 
     def forward(self, img):
-        # Need to add fictitious time-dimension
+        # Need to add fictitious time dimension
         if len(img.shape[:-3]) < 2:
             img = img.unsqueeze(1)
-        return self.linear(self.cnn(self.img_preprocess(img)))
+        out = self.linear(self.cnn(self.img_preprocess(img)))
+        # Remove fictitious time dimension
+        out = out.squeeze(1)
+        return out
 
     def load_cnn_weights(self, model_path="data/VPT-models"):
         self.cnn.load_state_dict(th.load(os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights")))
@@ -70,13 +73,15 @@ class ImpalaLinear(nn.Module):
 class ImpalaBinaryClassifier(nn.Module):
     """Classification network based on ImpalaCNN"""
 
-    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models"):
+    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models", hidden_size=256):
         super().__init__()
-        self.impala_linear = ImpalaLinear(2, cnn_outsize, cnn_width)
+        self.impala_linear = ImpalaLinear(hidden_size, cnn_outsize, cnn_width)
+        self.out_linear = nn.Linear(hidden_size, 2)
         self.impala_linear.load_cnn_weights(model_path)
+        self.hidden_size = hidden_size
 
     def forward(self, obs):
-        return self.impala_linear(obs)
+        return self.out_linear(self.impala_linear(obs))
 
 
 class ImpalaRewardModel(nn.Module):
