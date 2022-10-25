@@ -141,6 +141,7 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
     means = []
     running_mean = 255
     vars = []
+    craft = False
 
     # collect frames
     while success:
@@ -150,6 +151,19 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
         success, image = vidObj.read()
         if not success:
             break
+
+        # detect and skip crafting menu
+        if np.sum(np.abs(image[110:155,310:327, :].reshape((765,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[160:178,370:400,:].reshape((540,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[102:120,380:398,:].reshape((324,3)).mean(0) - np.array([197, 197, 197]))) < 5:
+           craft = True
+           continue
+
+        if actions[min(linecount, len(actions) - 1)]["isGuiOpen"]:
+            craft = True
+            continue
+
+        if craft:
+            craft = False
+            continue
 
         if darkness and keyframe < 0:
             greyImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
