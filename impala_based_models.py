@@ -15,10 +15,9 @@ from behavioural_cloning import load_model_parameters
 class ImpalaLinear(nn.Module):
     """ImpalaCNN followed by a linear layer.
 
-    :param cnn_outsize: impala output dimension
     :param output_size: output size of the linear layer.
-    :param dense_init_norm_kwargs: kwargs for linear FanInInitReLULayer
-    :param init_norm_kwargs: kwargs for 2d and 3d conv FanInInitReLULayer
+    :param cnn_outsize: impala output dimension
+    :param cnn_width: width ImpalaCNN
     """
 
     def __init__(
@@ -84,18 +83,18 @@ class ImpalaBinaryClassifier(nn.Module):
         return self.out_linear(self.impala_linear(obs))
 
 
-class ImpalaRewardModel(nn.Module):
-    """Reward model based on ImpalaCNN"""
+class ImpalaRegressor(nn.Module):
+    """Regression network based on ImpalaCNN"""
 
-    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models"):
+    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models", hidden_size=256):
         super().__init__()
-        self.impala_linear = ImpalaLinear(cnn_outsize, 1, cnn_width)
+        self.impala_linear = ImpalaLinear(hidden_size, cnn_outsize, cnn_width)
+        self.out_linear = nn.Linear(hidden_size, 1)
         self.impala_linear.load_cnn_weights(model_path)
-        # TODO normalizing layer
-        #self.normalized_reward_layer = nn.Linear(hidden_size, 1)
+        self.hidden_size = hidden_size
 
     def forward(self, obs):
-        return self.impala_linear(obs)
+        return self.out_linear(self.impala_linear(obs))
 
 
 def save_impala_cnn_weights(model_width=1):
@@ -130,7 +129,7 @@ def load_impala_cnn_weights(
     model_width=1,
     weights_path="data/VPT-models/ImpalaCNN-1x.weights",
 ):
-    """Load previously saved"""
+    """Load previously saved ImpalaCNN weights into a new model object"""
 
     if model_width == 1:
         chans=(64, 128, 128)
