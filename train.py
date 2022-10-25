@@ -11,11 +11,15 @@ from utils.logs import Logging
 from utils.create_videos import create_videos
 
 
-FOUNDATION_MODEL = "foundation-model-1x"
+FOUNDATION_MODEL = "foundation-model-2x"
+
 BC_TRAINING = True
 PREFRL_TRAINING = False
+
 ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
-NUM_VIDEOS = 1
+
+ESC_MODELS = ["FindCaveCNN_20221024_235019_epoch5"]
+NUM_VIDEOS = 5
 NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
@@ -39,9 +43,19 @@ def post_training():
 
     Logging.info("Creating videos...")
     for i, env in enumerate(ENVS):
-        model = "BehavioralCloning" if not PREFRL_TRAINING else "PreferenceBasedRL"
+        model = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
+        if BC_TRAINING:
+            model = f"train/BehavioralCloning{env}.weights"
+        elif PREFRL_TRAINING:
+            model = f"train/PreferenceBasedRL{env}.weights"
+
+        esc_model = None
+        try:
+            esc_model = f"train/{ESC_MODELS[i]}.weights"
+        except:
+            print("No ESC model available.")
         create_videos(
-            model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
+            model, esc_model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
         )
     Logging.info("End training")
 
