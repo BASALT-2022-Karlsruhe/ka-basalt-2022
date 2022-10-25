@@ -13,10 +13,11 @@ from utils.logs import Logging
 from openai_vpt.agent import resize_image, AGENT_RESOLUTION
 from impala_based_models import ImpalaBinaryClassifier
 
+
 LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
 STACK_SIZE = 1
-TRAIN = False
+TRAIN = True
 
 
 class FindCaveCNN(nn.Module):
@@ -184,15 +185,13 @@ def train(
         model_name="impala",
         data_frac=0.05,
         validation_frac=0.5,
+        balance_classes=False,
+        num_epochs=5,
+        batch_size=16,
+        lr=0.0001,
         report_rate=1000
     ):
     os.makedirs(model_dir, exist_ok=True)
-
-    # hyperparameters
-    balance_classes = False
-    num_epochs = 10
-    batch_size = 16
-    lr = 0.0001
 
     # only use fraction of the dataset
     if os.path.exists(stack_dir) and len(os.listdir(stack_dir)) > 0:
@@ -385,9 +384,9 @@ if __name__ == "__main__":
     Logging.info("Start creating dataset")
 
     create_dataset(
-        video_dir_cave="/home/aicrowd/data/segments/FindCaveBrightness/stage_2",
-        video_dir_expl="/home/aicrowd/data/segments/FindCaveBrightness/stage_1",
-        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
+        video_dir_cave="/home/aicrowd/data/segments/FindCaveBrightness2/stage_2",
+        video_dir_expl="/home/aicrowd/data/segments/FindCaveBrightness2/stage_1",
+        stack_dir="/home/aicrowd/data/segments/FindCaveBrightness2/rgb_images",
     )
 
     Logging.info("Finished creating dataset")
@@ -395,11 +394,15 @@ if __name__ == "__main__":
         Logging.info("Start training")
 
         train(
-            stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
+            stack_dir="/home/aicrowd/data/segments/FindCaveBrightness2/rgb_images",
             model_dir="/home/aicrowd/train",
             model_name="impala", # either "impala" or "naturecnn"
             data_frac=1., # fraction of data to be used
             validation_frac=0.1, # fraction of loaded data to be used for validation
+            balance_classes=False,
+            num_epochs=5,
+            batch_size=16,
+            lr=0.0001,
             report_rate=1000,
         )
 
@@ -410,7 +413,7 @@ if __name__ == "__main__":
         test(stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
             model_path="/home/aicrowd/train/FindCaveCNN_20221024_235019_epoch5.weights",
             model_name="impala",
-            data_frac=0.1
+            data_frac=0.1,
         )
         
         Logging.info("Finished validation")
