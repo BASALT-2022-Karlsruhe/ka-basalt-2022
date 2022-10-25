@@ -5,6 +5,8 @@ docker-compose.override.yaml
 .gitconfig
 Dockerfile-full
 
+demo_segmentation/example_segmentations
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
