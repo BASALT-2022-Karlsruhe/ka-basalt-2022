@@ -7,8 +7,10 @@ import gym
 from stable_baselines3 import PPO
 from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import (
+    RewardNet,
     CnnRewardNet,
     NormalizedRewardNet,
+    cnn_transpose,
 )
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
@@ -17,7 +19,18 @@ from openai_vpt.agent import MineRLAgent
 
 import sb3_minerl_envs  # noqa: F401
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
-from gym_wrappers import ObservationToInfos
+from impala_based_models import ImpalaRegressor
+
+
+class ImpalaRewardNet(RewardNet):
+    """Reward network based on the ImpalaCNN"""
+
+    def __init__(self, observation_space, action_space, model_width=1):
+        super().__init__(observation_space, action_space)
+        self.net = ImpalaRegressor(model_width)
+
+    def forward(self, state, action, next_state, done):
+        return self.net(cnn_transpose(state))
 
 
 def load_model_parameters(path_to_model_file):
@@ -36,6 +49,7 @@ def preference_based_RL_train(
     in_weights_rewardnet,
     out_weights_rewardnet,
     max_episode_steps,
+    reward_net_arch,
 ):
 
     # Setup MineRL environment
@@ -77,9 +91,11 @@ def preference_based_RL_train(
     # Setup preference-based reinforcement learning using the imitation package
     # TODO In general, check whether algorithm hyperparams make sense and tune
 
-    # TODO reuse ImpalaCNN from the VPT models with a regression head
     image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
-    reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
+    if reward_net_arch == "CNN":
+        reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
+    elif reward_net_arch == "ImpalaCNN":
+        reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
     reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(reward_net)
 
@@ -197,6 +213,12 @@ if __name__ == "__main__":
         type=str,
         help="Maximum number of steps in each episode.",
         default=10,
+    )
+    parser.add_argument(
+        "--reward-net-arch",
+        type=str,
+        help='Reward network architecture. Either "CNN" or "ImpalaCNN".',
+        default="CNN",
     )
 
     args = parser.parse_args()
