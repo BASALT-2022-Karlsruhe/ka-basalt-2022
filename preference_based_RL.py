@@ -210,7 +210,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--max-episode-steps",
-        type=str,
+        type=int,
         help="Maximum number of steps in each episode.",
         default=10,
     )
