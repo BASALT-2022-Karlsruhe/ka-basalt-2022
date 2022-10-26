@@ -4,6 +4,7 @@ docker-compose.override.yaml
 .profile
 .gitconfig
 Dockerfile-full
+example_segmentations/
 
 demo_segmentation/example_segmentations
 
