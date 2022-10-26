@@ -36,6 +36,7 @@ N_WORKERS = int(os.getenv("N_WORKERS", 50))
 DEVICE = "cuda"
 
 LOSS_REPORT_RATE = 100
+SAVE_WEIGHTS = False
 
 # Tuned with bit of trial and error
 LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
@@ -60,6 +61,7 @@ def load_model_parameters(path_to_model_file):
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     # save config
+    wandb.config.model = in_model
     wandb.config.epochs = EPOCHS
     wandb.config.batch_size = BATCH_SIZE
     wandb.config.n_workers = N_WORKERS
@@ -185,7 +187,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         if batch_i > MAX_BATCHES:
             break
 
-        if batch_i % 100 == 0:
+        if SAVE_WEIGHTS and batch_i % 100 == 0:
             Logging.info(f"Save weights to .tmp.{batch_i}")
             state_dict = policy.state_dict()
             th.save(state_dict, out_weights + f".tmp.{batch_i}")
