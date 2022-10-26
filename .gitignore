@@ -6,6 +6,8 @@ docker-compose.override.yaml
 Dockerfile-full
 example_segmentations/
 
+demo_segmentation/example_segmentations
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
