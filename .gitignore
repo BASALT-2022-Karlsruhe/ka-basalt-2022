@@ -4,6 +4,7 @@ docker-compose.override.yaml
 .profile
 .gitconfig
 Dockerfile-full
+example_segmentations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
