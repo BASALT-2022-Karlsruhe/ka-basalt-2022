@@ -44,10 +44,16 @@ LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
 # WEIGHT_DECAY = 0.039428
 WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 0.0))
 MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
 
-MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
+MAX_BATCHES = int(os.getenv("MAX_BATCHES", 1000))
+
+# Set which parts of the model to train
+TRAIN_PI_HEAD = True
+TRAIN_LAST_LAYER = True
+TRAIN_TRANSFORMER_BLOCKS = True
+TRAIN_IMPALA_CNN = False
 
 
 def load_model_parameters(path_to_model_file):
@@ -70,6 +76,10 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     wandb.config.kl_loss_weight = KL_LOSS_WEIGHT
     wandb.config.max_grad_norm = MAX_GRAD_NORM
     wandb.config.max_batches = MAX_BATCHES
+    wandb.config.train_pi_head = TRAIN_PI_HEAD
+    wandb.config.train_last_layer = TRAIN_LAST_LAYER
+    wandb.config.train_transformer_blocks = TRAIN_TRANSFORMER_BLOCKS
+    wandb.config.train_impala_cnn = TRAIN_IMPALA_CNN
 
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
@@ -87,17 +97,28 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     policy = agent.policy
     original_policy = original_agent.policy
 
-    # Freeze most params if using small dataset
+    # First freeze all params
     for param in policy.parameters():
         param.requires_grad = False
-    # Unfreeze final layers
+
+    # Unfreeze trainable model parts
     trainable_parameters = []
-    for param in policy.net.lastlayer.parameters():
-        param.requires_grad = True
-        trainable_parameters.append(param)
-    for param in policy.pi_head.parameters():
-        param.requires_grad = True
-        trainable_parameters.append(param)
+    if TRAIN_LAST_LAYER:
+        for param in policy.net.lastlayer.parameters():
+            param.requires_grad = True
+            trainable_parameters.append(param)
+    if TRAIN_PI_HEAD:
+        for param in policy.pi_head.parameters():
+            param.requires_grad = True
+            trainable_parameters.append(param)
+    if TRAIN_TRANSFORMER_BLOCKS:
+        for param in policy.net.recurrent_layer.parameters():
+            param.requires_grad = True
+            trainable_parameters.append(param)
+    if TRAIN_IMPALA_CNN:
+        for param in policy.net.img_process.parameters():
+            param.requires_grad = True
+            trainable_parameters.append(param)
 
     # Parameters taken from the OpenAI VPT paper
     optimizer = th.optim.Adam(
@@ -186,11 +207,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
         if batch_i > MAX_BATCHES:
             break
-
-        if SAVE_WEIGHTS and batch_i % 100 == 0:
-            Logging.info(f"Save weights to .tmp.{batch_i}")
-            state_dict = policy.state_dict()
-            th.save(state_dict, out_weights + f".tmp.{batch_i}")
 
     state_dict = policy.state_dict()
     th.save(state_dict, out_weights)
