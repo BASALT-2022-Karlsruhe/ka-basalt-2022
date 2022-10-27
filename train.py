@@ -72,31 +72,35 @@ def main():
                                     os.environ["WEIGHT_DECAY"]=str(weight_decay)
                                     os.environ["KL_LOSS_WEIGHT"]=str(kl_loss_weight)
                                     os.environ["MAX_BATCHES"]=str(max_batch)
-                                    pre_training()
-                                    if BC_TRAINING:
-                                        for env in ENVS:
-                                            run = wandb.init(project=f"BC Training {env}", reinit=True)
-                                            Logging.info(f"===BC Training {env} model===")
-                                            behavioural_cloning_train(
-                                                data_dir=f"data/MineRLBasalt{env}-v0",
-                                                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                                                in_weights=f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                                                out_weights=f"train/BehavioralCloning{env}.weights"
-                                            )
-                                            run.finish()
+                                    try:
+                                        pre_training()
+                                        if BC_TRAINING:
+                                            for env in ENVS:
+                                                run = wandb.init(project=f"BC Training {env}", reinit=True, entity="kabasalt_team")
+                                                Logging.info(f"===BC Training {env} model===")
+                                                behavioural_cloning_train(
+                                                    data_dir=f"data/MineRLBasalt{env}-v0",
+                                                    in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
+                                                    in_weights=f"data/VPT-models/{FOUNDATION_MODEL}.weights",
+                                                    out_weights=f"train/BehavioralCloning{env}.weights"
+                                                )
+                                                run.finish()
 
-                                    if PREFRL_TRAINING:
-                                        for env in ENVS:
-                                            run = wandb.init(project=f"PrefRL Training {env}", reinit=True)
-                                            Logging.info(f"===PrefRL Training {env} model===")
-                                            preference_based_RL_train(
-                                                env_str=env,
-                                                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                                                in_weights=f"train/BehavioralCloning{env}.weights",
-                                                out_weights=f"train/PreferenceBasedRL{env}.weights"
-                                            )
-                                            run.finish()
-                                    post_training()
+                                        if PREFRL_TRAINING:
+                                            for env in ENVS:
+                                                run = wandb.init(project=f"PrefRL Training {env}", reinit=True, entity="kabasalt_team")
+                                                Logging.info(f"===PrefRL Training {env} model===")
+                                                preference_based_RL_train(
+                                                    env_str=env,
+                                                    in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
+                                                    in_weights=f"train/BehavioralCloning{env}.weights",
+                                                    out_weights=f"train/PreferenceBasedRL{env}.weights"
+                                                )
+                                                run.finish()
+                                        post_training()
+                                    except:
+                                        pass
+    print('======== FINISHED =========')
 
 
 if __name__ == "__main__":
