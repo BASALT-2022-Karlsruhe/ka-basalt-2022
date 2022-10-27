@@ -2,6 +2,7 @@ curl
 git
 git-lfs
 vim
+wget
 ssh
 gcc
 libsm6
