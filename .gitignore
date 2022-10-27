@@ -5,6 +5,10 @@ docker-compose.override.yaml
 .gitconfig
 Dockerfile-full
 example_segmentations/
+train/videos
+train/reports
+train/logs
+wandb
 
 demo_segmentation/example_segmentations
 

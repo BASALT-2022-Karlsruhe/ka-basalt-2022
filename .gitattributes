@@ -2,5 +2,4 @@ train/BehavioralCloningCreateVillageAnimalPen.weights filter=lfs diff=lfs merge=
 train/BehavioralCloningFindCave.weights filter=lfs diff=lfs merge=lfs -text
 train/BehavioralCloningMakeWaterfall.weights filter=lfs diff=lfs merge=lfs -text
 train/BehavioralCloningBuildVillageHouse.weights filter=lfs diff=lfs merge=lfs -text
-train/.weights filter=lfs diff=lfs merge=lfs -text
 train/*.weights filter=lfs diff=lfs merge=lfs -text
