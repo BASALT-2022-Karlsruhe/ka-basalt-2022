@@ -15,12 +15,10 @@ EVALUATION_STAGE = os.getenv('EVALUATION_STAGE', 'testing')
 
 # Training Phase
 if EVALUATION_STAGE in ['all', 'training']:
-    print("=====Training Starts====")
     train.main()
 
 # Testing Phase
 if EVALUATION_STAGE in ['all', 'testing']:
-    print("=====Testing Starts====")
     test_BuildVillageHouse.main()
     test_CreateVillageAnimalPen.main()
     test_FindCave.main()

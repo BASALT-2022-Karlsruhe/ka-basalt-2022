@@ -1,8 +1,6 @@
 curl
 git
-git-lfs
 vim
-wget
 ssh
 gcc
 libsm6
@@ -16,4 +14,3 @@ freeglut3-dev
 libx11-6
 x11-xserver-utils
 build-essential
-libstdc++6

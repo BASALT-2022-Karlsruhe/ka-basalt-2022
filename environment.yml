@@ -2,24 +2,15 @@ name: minerl
 channels:
   - conda-forge
   - defaults
-  - pytorch
 dependencies:
-  - python=3.8
+  - python=3.7
   - pip
-  - wandb
   - py-opencv
+  - cudatoolkit=10.2
   - pip:
     - git+https://github.com/minerllabs/minerl
-    - matplotlib
-    - tqdm
     - coloredlogs
+    - matplotlib
     - aicrowd-api
     - aicrowd-gym
-    - gym3
-    - attrs
-    - --extra-index-url https://download.pytorch.org/whl/cu113
-    - torch==1.12.1+cu113
-    - werkzeug==2.1
-    - opencv-python-headless
-    - django
-    - djangorestframework
+

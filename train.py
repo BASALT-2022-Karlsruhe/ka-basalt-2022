@@ -1,113 +1,42 @@
-from datetime import datetime
-import subprocess
+import logging
+import os
 
-import wandb
+import numpy as np
+import gym
+import minerl
 
-from utils import create_subfolders
-from behavioural_cloning import behavioural_cloning_train
-from preference_based_RL import preference_based_RL_train
+import coloredlogs
+coloredlogs.install(logging.DEBUG)
 
-from utils.logs import Logging
-from utils.create_videos import create_videos
-
-
-FOUNDATION_MODEL = "foundation-model-1x"
-
-BC_TRAINING = True
-PREFRL_TRAINING = False
-
-ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
-
-ESC_MODELS = []
-NUM_VIDEOS = 5
-NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
-
-LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
-
-
-def pre_training():
-    """
-    executed before training # Add things you want to execute
-    """
-
-    create_subfolders.main()
-    Logging.setup(name=LOG_FILE)
-
-    Logging.info("Start training")
-
-
-def post_training():
-    """
-    executed after training  # Add things you want to execute
-    """
-
-    Logging.info("Creating videos...")
-    for i, env in enumerate(ENVS):
-        model = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
-        if BC_TRAINING:
-            model = f"train/BehavioralCloning{env}.weights"
-        elif PREFRL_TRAINING:
-            model = f"train/PreferenceBasedRL{env}.weights"
-
-        esc_model = None
-        try:
-            esc_model = f"train/{ESC_MODELS[i]}.weights"
-        except:
-            print("No ESC model available.")
-        create_videos(
-            model, esc_model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
-        )
-    Logging.info("End training")
+# The dataset and trained models are available in data/ directory from repository root.
+MINERL_DATA_ROOT = os.getenv('MINERL_DATA_ROOT', 'data/')
 
 
 def main():
-    pre_training()
+    """
+    This function will be called for training phase.
+    This should produce and save same files you upload during your submission.
+    All trained models should be placed under "train" directory!
+    """
+    # Sample code for illustration, add your training code below
+    env = gym.make('MineRLBasaltFindCave-v0')
 
-    if BC_TRAINING:
-        for env in ENVS:
-            run = wandb.init(
-                project=f"BC Training {env}", reinit=True, entity="kabasalt_team"
-            )
-            Logging.info(f"===BC Training {env} model===")
-            behavioural_cloning_train(
-                data_dir=f"data/MineRLBasalt{env}-v0",
-                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights=f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                out_weights=f"train/BehavioralCloning{env}.weights",
-            )
-            run.finish()
+    # For an example, lets just run 100 steps of the environment for training
+    obs = env.reset()
+    for _ in range(100):
+        obs, reward, done, info = env.step(env.action_space.sample())
+        # Do your training here
+        if done:
+            break
 
-    if PREFRL_TRAINING:
-        # start PrefCollect
-        proc = subprocess.Popen(
-            ["python", "pref-collect/manage.py", "runserver", "0.0.0.0:8000"],
-        )
+    # Save trained model to train/ directory
+    # For a demonstration, we save some dummy data.
+    # NOTE: All trained models should be placed under train directory!
+    np.save("./train/parameters.npy", np.random.random((10,)))
 
-        for env in ENVS:
-            run = wandb.init(
-                project=f"PrefRL Training {env}",
-                reinit=True,
-                sync_tensorboard=True,
-                monitor_gym=True,
-                entity="kabasalt_team",
-            )
-            Logging.info(f"===PrefRL Training {env} model===")
-            preference_based_RL_train(
-                env_str=env,
-                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights=f"train/BehavioralCloning{env}.weights"
-                if BC_TRAINING
-                else f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                out_weights=f"train/PreferenceBasedRL{env}.weights",
-            )
-            run.finish()
-            # Flush query database
-            subprocess.run(["python", "pref-collect/manage.py", "flush"])
-
-        # stop PrefCollect
-        proc.terminate()
-
-    post_training()
+    # Close environment and clean up any bigger memory hogs.
+    # Otherwise, you might start running into memory issues.
+    env.close()
 
 
 if __name__ == "__main__":
