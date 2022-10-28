@@ -49,12 +49,14 @@ and just start run.sh, then it will start the training process directly and you 
 3. Add it as a remote via `git remote add aicrowd git@gitlab.aicrowd.com:<user>/<repo>.git`. 
 4. Modify the `aicrowd.json` file. Use `"debug": true` when testing the submission process.
 5. Open bash in the docker container. 
-6. Before committing, make sure that the model-weights (and other large files you want to push) are marked with `Git LFS objects to be committed` when calling `git lfs status`. If not, run `git lfs track *.weights`. 
-7. Commit. 
-8. Push the branch you want to submit via `git push aicrowd <branch>` 
-9. Create a git tag with `git tag -am "submission-<version>" submission-<version>`
-10. Push the tag with `git push aicrowd submission-<version>`
-11. Check the status of your submission in the issues section of the repository.
+6. Run `git lfs track train/*.weights`.
+7. Check if the model-weights (and other large files you want to push) are marked with `Git LFS objects to be committed` when calling `git lfs status`.  
+8. If the model weights are not tracked correctly, run `git lfs migrate info --everything --include="train/*.weights"` followed by `git add --renormalize .` and check again.
+9. Commit. 
+10. Push the branch you want to submit via `git push aicrowd <branch>` 
+11. Create a git tag with `git tag -am "submission-<version>" submission-<version>`
+12. Push the tag with `git push aicrowd submission-<version>`
+13. Check the status of your submission in the issues section of the repository.
 
 # Testing code on Debian without Docker
 
