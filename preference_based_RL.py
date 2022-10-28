@@ -1,39 +1,41 @@
-from argparse import ArgumentParser
+"""Training script for preference-based reinforcment learning."""
 import pickle
+from argparse import ArgumentParser
+from symbol import comparison
 
-import torch as th
-import numpy as np
 import gym
-from stable_baselines3 import PPO
+import gym.spaces as spaces
+import minerl  # noqa
+import numpy as np
+import torch as th
 from imitation.algorithms import preference_comparisons
-from imitation.rewards.reward_nets import (
-    RewardNet,
-    CnnRewardNet,
-    NormalizedRewardNet,
-    cnn_transpose,
-)
+from imitation.rewards.reward_nets import CnnRewardNet, NormalizedRewardNet, RewardNet
+from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
-import minerl  # noqa: F401
-from openai_vpt.agent import MineRLAgent
+from stable_baselines3.ppo.ppo import PPO
 
-import sb3_minerl_envs  # noqa: F401
-from sb3_policy_wrapper import MinecraftActorCriticPolicy
+import sb3_minerl_envs  # noqa
+import wandb
 from impala_based_models import ImpalaRegressor
+from openai_vpt.agent import MineRLAgent
+from sb3_policy_wrapper import MinecraftActorCriticPolicy
 
 
 class ImpalaRewardNet(RewardNet):
-    """Reward network based on the ImpalaCNN"""
+    """Reward network based on the ImpalaCNN."""
 
     def __init__(self, observation_space, action_space, model_width=1):
         super().__init__(observation_space, action_space)
-        self.net = ImpalaRegressor(model_width)
+        self.net = ImpalaRegressor(cnn_width=model_width)
 
     def forward(self, state, action, next_state, done):
-        return self.net(cnn_transpose(state))
+        rewards = self.net(state).squeeze()
+        return rewards
 
 
 def load_model_parameters(path_to_model_file):
+    """Load VPT model params."""
     agent_parameters = pickle.load(open(path_to_model_file, "rb"))
     policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
     pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
@@ -51,8 +53,52 @@ def preference_based_RL_train(
     max_episode_steps,
     reward_net_arch,
 ):
+    """Training workflow for preference-based RL."""
+    # Hyperparameters
+
+    seed = 0
+
+    # Reward model training
+    n_iterations = 5
+    n_epochs_reward_model = 3
+    n_comparisons = 10
+    comparison_queue_size = None  # None = unbounded queue size
+    initial_comparison_frac = 0.1
+    fragment_length = 1
+
+    # PPO
+    n_total_steps_ppo = 30
+    n_epochs_ppo = 1
+    n_steps_ppo = 10
+    lr_ppo = 0.0003
+    batch_size_ppo = 10
+    ent_coef_ppo = 0.0
+
+    # Setup W&B config
+    if wandb.run is not None:
+        wandb.config.seed = seed
+
+        wandb.config.reward_net_arch = reward_net_arch
+        wandb.config.n_iterations = n_iterations
+        wandb.config.n_epochs_reward_model = n_epochs_reward_model
+        wandb.config.n_comparisons = n_comparisons
+        wandb.config.comparison_queue_size = comparison_queue_size
+        wandb.config.initial_comparison_frac = initial_comparison_frac
+        wandb.config.fragment_length = fragment_length
+
+        wandb.config.n_steps_ppo = n_steps_ppo
+        wandb.config.batch_size_ppo = batch_size_ppo
+        wandb.config.ent_coef_ppo = ent_coef_ppo
+        wandb.config.learning_rate_ppo = lr_ppo
+        wandb.config.n_epochs_ppo = n_epochs_ppo
+        wandb.config.n_total_steps_ppo = n_total_steps_ppo
+
+    # Setup logger
+    logger = imit_logger.configure()
 
     # Setup MineRL environment
+    device = th.device("cuda" if th.cuda.is_available() else "cpu")
+
     minerl_env_str = "MineRLBasalt" + env_str
     env = gym.make(minerl_env_str + "-v0")
 
@@ -61,7 +107,7 @@ def preference_based_RL_train(
 
     minerl_agent = MineRLAgent(
         env,
-        device="cuda",
+        device=device,
         policy_kwargs=agent_policy_kwargs,
         pi_head_kwargs=agent_pi_head_kwargs,
     )
@@ -88,28 +134,36 @@ def preference_based_RL_train(
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
 
-    # Setup preference-based reinforcement learning using the imitation package
-    # TODO In general, check whether algorithm hyperparams make sense and tune
-
-    image_obs_space = gym.spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
+    # Define reward model
+    image_obs_space = spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
     if reward_net_arch == "CNN":
         reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
     elif reward_net_arch == "ImpalaCNN":
         reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
+    else:
+        raise ValueError(f"Reward network architecture unknown: {reward_net_arch}")
+    if in_weights_rewardnet:
+        reward_net.load_state_dict(th.load(in_weights_rewardnet))
     reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(reward_net)
 
-    fragmenter = preference_comparisons.MineRLFragmenter(warning_threshold=0, seed=0)
+    fragmenter = preference_comparisons.MineRLFragmenter(
+        warning_threshold=0,
+        seed=seed,
+        custom_logger=logger,
+    )
 
     gatherer = preference_comparisons.PrefCollectGatherer(
         pref_collect_address="http://127.0.0.1:8000",
         video_output_dir="/home/aicrowd/pref-collect/videofiles/",
+        custom_logger=logger,
     )
 
     reward_trainer = preference_comparisons.BasicRewardTrainer(
         model=reward_net,
         loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
-        epochs=3,
+        epochs=n_epochs_reward_model,
+        custom_logger=logger,
     )
 
     agent = PPO(
@@ -119,12 +173,12 @@ def preference_based_RL_train(
             "optimizer_class": th.optim.Adam,
         },
         env=venv,
-        seed=0,
-        n_steps=512 // venv.num_envs,
-        batch_size=32,
-        ent_coef=0.0,
-        learning_rate=0.0003,
-        n_epochs=10,
+        seed=seed,
+        n_steps=n_steps_ppo // venv.num_envs,
+        batch_size=batch_size_ppo,
+        ent_coef=ent_coef_ppo,
+        learning_rate=lr_ppo,
+        n_epochs=n_epochs_ppo,
     )
 
     trajectory_generator = preference_comparisons.MineRLAgentTrainer(
@@ -132,29 +186,30 @@ def preference_based_RL_train(
         reward_fn=reward_net,
         venv=venv,
         exploration_frac=0.0,
-        seed=0,
+        seed=seed,
+        custom_logger=logger,
     )
 
-    pref_comparisons = preference_comparisons.PreferenceComparisons(
+    pref_comparisons = preference_comparisons.MineRLPreferenceComparisons(
         trajectory_generator,
         reward_net,
-        num_iterations=5,
+        num_iterations=n_iterations,
         fragmenter=fragmenter,
         preference_gatherer=gatherer,
         reward_trainer=reward_trainer,
-        comparison_queue_size=2,
-        fragment_length=6,
+        comparison_queue_size=comparison_queue_size,
+        fragment_length=fragment_length,
         transition_oversampling=1,
-        initial_comparison_frac=0.1,
+        initial_comparison_frac=initial_comparison_frac,
         allow_variable_horizon=True,
-        seed=0,
+        seed=seed,
         initial_epoch_multiplier=1,
     )
 
     # Run training
     pref_comparisons.train(
-        total_timesteps=500,  # For good performance this should be 1_000_000
-        total_comparisons=10,  # For good performance this should be 5_000
+        total_timesteps=n_total_steps_ppo,  # For good performance this should be 1_000_000
+        total_comparisons=n_comparisons,  # For good performance this should be 5_000
     )
 
     venv.close()
@@ -230,4 +285,5 @@ if __name__ == "__main__":
         args.in_weights_rewardnet,
         args.out_weights_rewardnet,
         args.max_episode_steps,
+        args.reward_net_arch,
     )
