@@ -9,36 +9,38 @@ from multiprocessing import Process, Queue, Event
 import numpy as np
 import cv2
 
-from openai_vpt.agent import ACTION_TRANSFORMER_KWARGS, resize_image, AGENT_RESOLUTION
-from openai_vpt.lib.actions import ActionTransformer
+from openai_vpt.agent import resize_image, AGENT_RESOLUTION
 
 QUEUE_TIMEOUT = 10
 
-CURSOR_FILE = os.path.join(os.path.dirname(__file__), "cursors", "mouse_cursor_white_16x16.png")
+CURSOR_FILE = os.path.join(
+    os.path.dirname(__file__), "cursors", "mouse_cursor_white_16x16.png"
+)
 
 # Mapping from JSON keyboard buttons to MineRL actions
 KEYBOARD_BUTTON_MAPPING = {
-    "key.keyboard.escape" :"ESC",
-    "key.keyboard.s" :"back",
-    "key.keyboard.q" :"drop",
-    "key.keyboard.w" :"forward",
-    "key.keyboard.1" :"hotbar.1",
-    "key.keyboard.2" :"hotbar.2",
-    "key.keyboard.3" :"hotbar.3",
-    "key.keyboard.4" :"hotbar.4",
-    "key.keyboard.5" :"hotbar.5",
-    "key.keyboard.6" :"hotbar.6",
-    "key.keyboard.7" :"hotbar.7",
-    "key.keyboard.8" :"hotbar.8",
-    "key.keyboard.9" :"hotbar.9",
-    "key.keyboard.e" :"inventory",
-    "key.keyboard.space" :"jump",
-    "key.keyboard.a" :"left",
-    "key.keyboard.d" :"right",
-    "key.keyboard.left.shift" :"sneak",
-    "key.keyboard.left.control" :"sprint",
-    "key.keyboard.f" :"swapHands",
+    "key.keyboard.escape": "ESC",
+    "key.keyboard.s": "back",
+    "key.keyboard.q": "drop",
+    "key.keyboard.w": "forward",
+    "key.keyboard.1": "hotbar.1",
+    "key.keyboard.2": "hotbar.2",
+    "key.keyboard.3": "hotbar.3",
+    "key.keyboard.4": "hotbar.4",
+    "key.keyboard.5": "hotbar.5",
+    "key.keyboard.6": "hotbar.6",
+    "key.keyboard.7": "hotbar.7",
+    "key.keyboard.8": "hotbar.8",
+    "key.keyboard.9": "hotbar.9",
+    "key.keyboard.e": "inventory",
+    "key.keyboard.space": "jump",
+    "key.keyboard.a": "left",
+    "key.keyboard.d": "right",
+    "key.keyboard.left.shift": "sneak",
+    "key.keyboard.left.control": "sprint",
+    "key.keyboard.f": "swapHands",
 }
+
 
 # Template action
 NOOP_ACTION = {
@@ -83,6 +85,78 @@ MINEREC_VERSION_SPECIFIC_SCALERS = {
     "6.8": 2.0,
     "6.9": 2.0,
 }
+
+
+INV_KEYBOARD_BUTTON_MAPPING = {v: k for k, v in KEYBOARD_BUTTON_MAPPING.items()}
+
+
+def env_action_to_json_action(env_action, prev_json_action=None):
+    """
+    Converts a MineRL action into a json action.
+    Requires information from previous json action.
+    Returns json_action
+    """
+    json_action = {}
+    json_action["keyboard"] = {}
+    json_action["keyboard"]["keys"] = []
+    json_action["keyboard"]["newKeys"] = []
+    json_action["mouse"] = {}
+    json_action["mouse"]["buttons"] = []
+    json_action["mouse"]["newButtons"] = []
+    json_action["hotbar"] = 0
+    json_action["tick"] = prev_json_action["tick"] + 1 if prev_json_action else 0
+
+    # determine whether GUI is open
+    e_pressed = (
+        "key.keyboard.e" in prev_json_action["keyboard"]["keys"]
+        if prev_json_action
+        else False
+    )
+    prev_gui_open = prev_json_action["isGuiOpen"] if prev_json_action else False
+    json_action["isGuiOpen"] = e_pressed != prev_gui_open
+
+    # process keyboard actions
+    for key, json_key in INV_KEYBOARD_BUTTON_MAPPING.items():
+        if key in env_action and env_action[key] == 1:
+            json_action["keyboard"]["keys"].append(
+                json_key,
+            )
+
+            # track newly pressed keys
+            if (
+                prev_json_action
+                and json_key not in prev_json_action["keyboard"]["keys"]
+            ):
+                json_action["keyboard"]["newKeys"].append(json_key)
+
+            # update hotbar entry (note: we can't update based on mouse wheel)
+            if key.startswith("hotbar"):
+                json_action["hotbar"] = int(key.split(".")[1]) - 1
+
+    # process mouse actions
+    camera_action = env_action["camera"][0]
+    json_action["mouse"]["dy"] = round(camera_action[0] / CAMERA_SCALER)
+    json_action["mouse"]["dx"] = round(camera_action[1] / CAMERA_SCALER)
+    json_action["mouse"]["x"] = (
+        prev_json_action["mouse"]["x"] + prev_json_action["mouse"]["dx"]
+        if prev_json_action
+        else 640.0
+    )
+    json_action["mouse"]["y"] = (
+        prev_json_action["mouse"]["y"] + prev_json_action["mouse"]["dy"]
+        if prev_json_action
+        else 360.0
+    )
+
+    buttons = ["attack", "use", "pickItem"]
+    for i, button in enumerate(buttons):
+        if button in env_action and env_action[button] == 1:
+            json_action["mouse"]["buttons"].append(i)
+            # track newly pressed buttons
+            if prev_json_action and i not in prev_json_action["mouse"]["buttons"]:
+                json_action["mouse"]["newButtons"].append(i)
+
+    return json_action
 
 
 def json_action_to_env_action(json_action):
@@ -144,7 +218,9 @@ def composite_images_with_alpha(image1, image2, alpha, x, y):
     if ch == 0 or cw == 0:
         return
     alpha = alpha[:ch, :cw]
-    image1[y:y + ch, x:x + cw, :] = (image1[y:y + ch, x:x + cw, :] * (1 - alpha) + image2[:ch, :cw, :] * alpha).astype(np.uint8)
+    image1[y : y + ch, x : x + cw, :] = (
+        image1[y : y + ch, x : x + cw, :] * (1 - alpha) + image2[:ch, :cw, :] * alpha
+    ).astype(np.uint8)
 
 
 def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
@@ -193,7 +269,9 @@ def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
                     attack_is_stuck = False
             # If still stuck, remove the action
             if attack_is_stuck:
-                step_data["mouse"]["buttons"] = [button for button in step_data["mouse"]["buttons"] if button != 0]
+                step_data["mouse"]["buttons"] = [
+                    button for button in step_data["mouse"]["buttons"] if button != 0
+                ]
 
             action, is_null_action = json_action_to_env_action(step_data)
 
@@ -215,7 +293,9 @@ def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
                     camera_scaling_factor = frame.shape[0] / MINEREC_ORIGINAL_HEIGHT_PX
                     cursor_x = int(step_data["mouse"]["x"] * camera_scaling_factor)
                     cursor_y = int(step_data["mouse"]["y"] * camera_scaling_factor)
-                    composite_images_with_alpha(frame, cursor_image, cursor_alpha, cursor_x, cursor_y)
+                    composite_images_with_alpha(
+                        frame, cursor_image, cursor_alpha, cursor_x, cursor_y
+                    )
                 cv2.cvtColor(frame, code=cv2.COLOR_BGR2RGB, dst=frame)
                 frame = np.asarray(np.clip(frame, 0, 255), dtype=np.uint8)
                 frame = resize_image(frame, AGENT_RESOLUTION)
@@ -232,6 +312,7 @@ def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
     # Tell that we ended
     output_queue.put(None)
 
+
 class DataLoader:
     """
     Generator class for loading batches from a dataset
@@ -247,8 +328,13 @@ class DataLoader:
     - Loads up individual files as trajectory files (i.e. if a trajectory is split into multiple files,
       this code will load it up as a separate item).
     """
-    def __init__(self, dataset_dir, n_workers=8, batch_size=8, n_epochs=1, max_queue_size=8):
-        assert n_workers >= batch_size, "Number of workers must be equal or greater than batch size"
+
+    def __init__(
+        self, dataset_dir, n_workers=8, batch_size=8, n_epochs=1, max_queue_size=8
+    ):
+        assert (
+            n_workers >= batch_size
+        ), "Number of workers must be equal or greater than batch size"
         self.dataset_dir = dataset_dir
         self.n_workers = n_workers
         self.n_epochs = n_epochs
@@ -264,7 +350,9 @@ class DataLoader:
             json_path = os.path.abspath(os.path.join(dataset_dir, unique_id + ".jsonl"))
             demonstration_tuples.append((video_path, json_path))
 
-        assert n_workers <= len(demonstration_tuples), f"n_workers should be lower or equal than number of demonstrations {len(demonstration_tuples)}"
+        assert n_workers <= len(
+            demonstration_tuples
+        ), f"n_workers should be lower or equal than number of demonstrations {len(demonstration_tuples)}"
 
         # Repeat dataset for n_epochs times, shuffling the order for
         # each epoch
@@ -290,7 +378,7 @@ class DataLoader:
                     output_queue,
                     self.quit_workers_event,
                 ),
-                daemon=True
+                daemon=True,
             )
             for output_queue in self.output_queues
         ]
@@ -306,7 +394,9 @@ class DataLoader:
         batch_episode_id = []
 
         for i in range(self.batch_size):
-            workitem = self.output_queues[self.n_steps_processed % self.n_workers].get(timeout=QUEUE_TIMEOUT)
+            workitem = self.output_queues[self.n_steps_processed % self.n_workers].get(
+                timeout=QUEUE_TIMEOUT
+            )
             if workitem is None:
                 # Stop iteration when first worker runs out of work to do.
                 # Yes, this has a chance of cutting out a lot of the work,
