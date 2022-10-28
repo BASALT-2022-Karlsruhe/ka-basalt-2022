@@ -1,7 +1,7 @@
 import os
 
-def create(subfolder):
-    path = f"/home/aicrowd/train/{subfolder}"
+def create(subfolder, root_dir="train"):
+    path = os.path.join(root_dir, subfolder)
     if not os.path.exists(path):
         os.mkdir(path)
 

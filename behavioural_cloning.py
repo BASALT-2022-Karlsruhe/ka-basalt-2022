@@ -12,6 +12,7 @@ import gym
 import minerl
 import torch as th
 import numpy as np
+import os
 
 from argparse import ArgumentParser
 from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
@@ -24,28 +25,29 @@ from utils.logs import Logging
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = True
 
-EPOCHS = 1 if USING_FULL_DATASET else 2
+EPOCHS = int(os.getenv("EPOCHS", 1))
 # Needs to be <= number of videos
-BATCH_SIZE = 32 if USING_FULL_DATASET else 16
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 32))
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 50 if USING_FULL_DATASET else 20
+N_WORKERS = int(os.getenv("N_WORKERS", 50))
 DEVICE = "cuda"
 
 LOSS_REPORT_RATE = 100
+SAVE_WEIGHTS = False
 
 # Tuned with bit of trial and error
-LEARNING_RATE = 0.000181
+LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
-WEIGHT_DECAY = 0.0
+WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = 1.0
-MAX_GRAD_NORM = 5.0
+KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
 
-MAX_BATCHES = 2700 if USING_FULL_DATASET else int(1e9)
+MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
 
 
 def load_model_parameters(path_to_model_file):
@@ -59,6 +61,7 @@ def load_model_parameters(path_to_model_file):
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     # save config
+    wandb.config.model = in_model
     wandb.config.epochs = EPOCHS
     wandb.config.batch_size = BATCH_SIZE
     wandb.config.n_workers = N_WORKERS
@@ -184,7 +187,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         if batch_i > MAX_BATCHES:
             break
 
-        if batch_i % 100 == 0:
+        if SAVE_WEIGHTS and batch_i % 100 == 0:
             Logging.info(f"Save weights to .tmp.{batch_i}")
             state_dict = policy.state_dict()
             th.save(state_dict, out_weights + f".tmp.{batch_i}")
