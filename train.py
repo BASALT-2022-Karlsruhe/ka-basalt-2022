@@ -3,6 +3,7 @@ import subprocess
 from datetime import datetime
 
 import wandb
+
 from auto_preference_based_RL import auto_preference_based_RL_train
 from behavioural_cloning import behavioural_cloning_train
 from generate_agent_trajectories import generate_trajectories
@@ -52,7 +53,7 @@ PREFRL_TRAINING = False
 GENERATE_NUM_EPISODES = 10
 ESC_MODELS = []
 NUM_EVAL_VIDEOS = 5
-NUM_MAX_STEPS = [20, 20, 20, 20]  # [3600, 6000, 6000, 14400]
+NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
 
 
 def pre_training():
@@ -79,7 +80,7 @@ def post_training(policy_weights_path):
             Logging.info("No ESC model available.")
 
         create_videos(
-            policy_weights_path,
+            policy_weights_path.format(env),
             esc_weights_path,
             env,
             FOUNDATION_MODEL,
