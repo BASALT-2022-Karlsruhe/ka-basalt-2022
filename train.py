@@ -1,116 +1,212 @@
-from datetime import datetime
+"""Train script for MineRL BASALT competition."""
 import subprocess
+from datetime import datetime
 
 import wandb
-
-from utils import create_subfolders
+from auto_preference_based_RL import auto_preference_based_RL_train
 from behavioural_cloning import behavioural_cloning_train
+from generate_agent_trajectories import generate_trajectories
 from preference_based_RL import preference_based_RL_train
-
-from utils.logs import Logging
+from utils import create_subfolders
 from utils.create_videos import create_videos
-
-
-FOUNDATION_MODEL = "foundation-model-1x"
-
-BC_TRAINING = True
-PREFRL_TRAINING = False
-
-ENVS = ["FindCave", "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
-
-ESC_MODELS = []
-NUM_VIDEOS = 5
-NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
+from utils.logs import Logging
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
+USE_WANDB = False
+
+BC_PREFIX = "BehavioralCloning"
+PREFRL_PREFIX = "PreferenceBasedRL"
+ENVS = [
+    "FindCave",
+]
+#  , "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
+
+# Model and weights paths
+FOUNDATION_MODEL = "foundation-model-1x"
+MODEL_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.model"
+FOUNDATION_WEIGHTS_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
+
+BC_WEIGHTS_PATH = f"train/{BC_PREFIX}{{}}.weights"
+PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH = (
+    f"train/{PREFRL_PREFIX}{{}}_PretrainedPolicy.weights"
+)
+PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH = (
+    f"train/{PREFRL_PREFIX}{{}}_PretrainedRewardNet.weights"
+)
+PREFRL_POLICY_WEIGHTS_PATH = f"train/{PREFRL_PREFIX}{{}}_Policy.weights"
+PREFRL_REWARDNET_WEIGHTS_PATH = f"train/{PREFRL_PREFIX}{{}}_RewardNet.weights"
+
+ESC_WEIGHTS_PATHS = []
+
+# Trajectory data dirs
+EXPERT_DATA_DIR = "data/MineRLBasalt{}-v0"
+AGENT_DATA_DIR = "data/agent/MineRLBasalt{}-v0"
+
+# Control training components
+BC_TRAINING = False
+AGENT_DATA_GENERATION = False
+PREFRL_PRETRAINING = True
+PREFRL_TRAINING = False
+
+# Training parameters
+GENERATE_NUM_EPISODES = 10
+ESC_MODELS = []
+NUM_EVAL_VIDEOS = 5
+NUM_MAX_STEPS = [20, 20, 20, 20]  # [3600, 6000, 6000, 14400]
 
 
 def pre_training():
-    """
-    executed before training # Add things you want to execute
-    """
-
+    """Execute before training."""
     create_subfolders.main()
     Logging.setup(name=LOG_FILE)
 
     Logging.info("Start training")
 
 
-def post_training():
-    """
-    executed after training  # Add things you want to execute
-    """
+def post_training(policy_weights_path):
+    """Execute after training.
 
-    Logging.info("Creating videos...")
+    Args:
+        policy_weights_path (str): Path to trained policy weights
+    """
     for i, env in enumerate(ENVS):
-        model = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
-        if BC_TRAINING:
-            model = f"train/BehavioralCloning{env}.weights"
-        elif PREFRL_TRAINING:
-            model = f"train/PreferenceBasedRL{env}.weights"
+        Logging.info(f"===Creating evaluation videos for {env}===")
 
-        esc_model = None
+        esc_weights_path = None
         try:
-            esc_model = f"train/{ESC_MODELS[i]}.weights"
-        except:
-            print("No ESC model available.")
+            esc_weights_path = ESC_WEIGHTS_PATHS[i]
+        except IndexError:
+            Logging.info("No ESC model available.")
+
         create_videos(
-            model, esc_model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
+            policy_weights_path,
+            esc_weights_path,
+            env,
+            FOUNDATION_MODEL,
+            NUM_EVAL_VIDEOS,
+            NUM_MAX_STEPS[i],
+            show=False,
         )
     Logging.info("End training")
 
 
 def main():
+    """Run the training pipeline."""
     pre_training()
+
+    next_policy_weights_path = FOUNDATION_WEIGHTS_PATH
+    next_rewardnet_weights_path = None
 
     if BC_TRAINING:
         for env in ENVS:
-            run = wandb.init(
-                project=f"BC Training {env}", reinit=True, entity="kabasalt_team"
+            run = (
+                wandb.init(
+                    project=f"BC Training {env}",
+                    reinit=True,
+                    entity="kabasalt_team",
+                )
+                if USE_WANDB
+                else None
             )
             Logging.info(f"===BC Training {env} model===")
             behavioural_cloning_train(
-                data_dir=f"data/MineRLBasalt{env}-v0",
-                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights=f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                out_weights=f"train/BehavioralCloning{env}.weights",
+                data_dir=EXPERT_DATA_DIR.format(env),
+                in_model=MODEL_PATH,
+                in_weights=next_policy_weights_path,
+                out_weights=BC_WEIGHTS_PATH.format(env),
             )
-            run.finish()
+            if USE_WANDB:
+                run.finish()
+        next_policy_weights_path = BC_WEIGHTS_PATH
+
+    if AGENT_DATA_GENERATION:
+        for i, env in enumerate(ENVS):
+            Logging.info(f"===Data generation with {env} model===")
+
+            generate_trajectories(
+                MODEL_PATH,
+                next_policy_weights_path,
+                env,
+                n_episodes=GENERATE_NUM_EPISODES,
+                max_steps=NUM_MAX_STEPS[i],
+                video_dir=AGENT_DATA_DIR.format(env),
+            )
+
+    if PREFRL_PRETRAINING:
+        for i, env in enumerate(ENVS):
+            run = (
+                wandb.init(
+                    project=f"PrefRL Pretraining {env}",
+                    reinit=True,
+                    sync_tensorboard=True,
+                    monitor_gym=True,
+                    entity="kabasalt_team",
+                )
+                if USE_WANDB
+                else None
+            )
+            Logging.info(f"===Reward network Training {env}===")
+            auto_preference_based_RL_train(
+                env_str=env,
+                in_model=MODEL_PATH,
+                in_weights_policy=next_policy_weights_path,
+                out_weights_policy=PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH.format(env),
+                in_weights_rewardnet=next_rewardnet_weights_path,
+                out_weights_rewardnet=PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH.format(
+                    env,
+                ),
+                max_episode_steps=NUM_MAX_STEPS[i],
+                reward_net_arch="ImpalaCNN",
+                expert_data=EXPERT_DATA_DIR.format(env),
+                agent_data=AGENT_DATA_DIR.format(env),
+            )
+            if USE_WANDB:
+                run.finish()
+            next_policy_weights_path = PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH
+            next_rewardnet_weights_path = PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH
 
     if PREFRL_TRAINING:
-        # start PrefCollect
+
+        # Start PrefCollect
         proc = subprocess.Popen(
             ["python", "pref-collect/manage.py", "runserver", "0.0.0.0:8000"],
         )
 
         for i, env in enumerate(ENVS):
-            run = wandb.init(
-                project=f"PrefRL Training {env}",
-                reinit=True,
-                sync_tensorboard=True,
-                monitor_gym=True,
-                entity="kabasalt_team",
+            run = (
+                wandb.init(
+                    project=f"PrefRL Training {env}",
+                    reinit=True,
+                    sync_tensorboard=True,
+                    monitor_gym=True,
+                    entity="kabasalt_team",
+                )
+                if USE_WANDB
+                else None
             )
             Logging.info(f"===PrefRL Training {env} model===")
             preference_based_RL_train(
                 env_str=env,
-                in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
-                in_weights_policy=f"train/BehavioralCloning{env}.weights"
-                if BC_TRAINING
-                else f"data/VPT-models/{FOUNDATION_MODEL}.weights",
-                out_weights_policy=f"train/PreferenceBasedRL{env}.weights",
-                in_weights_rewardnet=None,
-                out_weights_rewardnet=f"train/RewardNet{env}.weights",
+                in_model=MODEL_PATH,
+                in_weights_policy=next_policy_weights_path.format(env),
+                out_weights_policy=PREFRL_POLICY_WEIGHTS_PATH.format(env),
+                in_weights_rewardnet=next_rewardnet_weights_path.format(env),
+                out_weights_rewardnet=PREFRL_REWARDNET_WEIGHTS_PATH.format(env),
                 max_episode_steps=NUM_MAX_STEPS[i],
             )
-            run.finish()
-            # Flush query database
+            if USE_WANDB:
+                run.finish()
+
+            # Flush PrefCollect's query database
             subprocess.run(["python", "pref-collect/manage.py", "flush"])
 
-        # stop PrefCollect
+        # Stop PrefCollect
         proc.terminate()
 
-    post_training()
+        next_policy_weights_path = PREFRL_POLICY_WEIGHTS_PATH
+        next_rewardnet_weights_path = PREFRL_REWARDNET_WEIGHTS_PATH
+
+    post_training(next_policy_weights_path)
 
 
 if __name__ == "__main__":
