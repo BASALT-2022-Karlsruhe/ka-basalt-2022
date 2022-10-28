@@ -14,7 +14,9 @@ from openai_vpt.agent import resize_image, AGENT_RESOLUTION
 from impala_based_models import ImpalaBinaryClassifier
 
 
-LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
+LOG_FILE = (
+    f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
+)
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
 STACK_SIZE = 1
 TRAIN = True
@@ -25,22 +27,42 @@ class FindCaveCNN(nn.Module):
         super().__init__()
         features_dim = 2
         n_input_channels = STACK_SIZE
-        first_conv_out_channels =  32
+        first_conv_out_channels = 32
         second_conv_out_channels = 64
-        third_conv_out_channels =  64
+        third_conv_out_channels = 64
         self.cnn = nn.Sequential(
-            nn.Conv2d(n_input_channels, first_conv_out_channels, kernel_size=8, stride=4, padding=0),
+            nn.Conv2d(
+                n_input_channels,
+                first_conv_out_channels,
+                kernel_size=8,
+                stride=4,
+                padding=0,
+            ),
             nn.ReLU(),
-            nn.Conv2d(first_conv_out_channels, second_conv_out_channels, kernel_size=4, stride=2, padding=0),
+            nn.Conv2d(
+                first_conv_out_channels,
+                second_conv_out_channels,
+                kernel_size=4,
+                stride=2,
+                padding=0,
+            ),
             nn.ReLU(),
-            nn.Conv2d(second_conv_out_channels, third_conv_out_channels, kernel_size=3, stride=1, padding=0),
+            nn.Conv2d(
+                second_conv_out_channels,
+                third_conv_out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=0,
+            ),
             nn.ReLU(),
             nn.Flatten(),
         )
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            test_tensor = th.as_tensor(np.zeros((STACK_SIZE, *AGENT_RESOLUTION))[None]).float()
+            test_tensor = th.as_tensor(
+                np.zeros((STACK_SIZE, *AGENT_RESOLUTION))[None]
+            ).float()
             n_flatten = self.cnn(test_tensor).shape[1]
 
         self.linear = nn.Linear(n_flatten, features_dim)
@@ -50,7 +72,7 @@ class FindCaveCNN(nn.Module):
 
     def predict(self, observations):
         return self.forward(observation).argmax(dim=1)
-        #return self.forward(observation) > 0.
+        # return self.forward(observation) > 0.
 
 
 def preprocessing(img, greyscale=False, norm=False):
@@ -62,7 +84,7 @@ def preprocessing(img, greyscale=False, norm=False):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     if norm:
         # scale pixel values to [-1, 1]
-        img = 2 * (img / 255.) - 1
+        img = 2 * (img / 255.0) - 1
     return img
 
 
@@ -77,7 +99,7 @@ def process_video(video_path, rgb_images=True):
     success = True
     while success:
         success, img = video_object.read()
-        if  success and img is not None:
+        if success and img is not None:
             processed_img = preprocessing(img)
             current_stack[count % STACK_SIZE, ...] = processed_img
             count += 1
@@ -131,7 +153,7 @@ class FindCaveImageDataset(Dataset):
                 if os.path.exists(filepath):
                     self.stack_files.append(filename)
                     self.stack_labels.append(label)
-                    break # each stack can only have one label
+                    break  # each stack can only have one label
 
         assert len(self.stack_files) == len(self.stack_labels) == self.num_stacks
 
@@ -146,18 +168,21 @@ class FindCaveImageDataset(Dataset):
             self.num_stacks -= abs(difference_01)
 
             # Randomly choose items to delete from registry lists
-            if difference_01 > 0: # more 0 labels
+            if difference_01 > 0:  # more 0 labels
                 label_0_idxs = np.where(np.array(self.stack_labels) == 0)[0]
-                delete_idxs = np.random.choice(label_0_idxs, abs(difference_01), replace=False)               
-            elif difference_01 < 0: # more 1 labels
+                delete_idxs = np.random.choice(
+                    label_0_idxs, abs(difference_01), replace=False
+                )
+            elif difference_01 < 0:  # more 1 labels
                 label_1_idxs = np.where(np.array(self.stack_labels) == 1)[0]
-                delete_idxs = np.random.choice(label_1_idxs, abs(difference_01), replace=False)               
+                delete_idxs = np.random.choice(
+                    label_1_idxs, abs(difference_01), replace=False
+                )
 
             for del_idx in sorted(delete_idxs, reverse=True):
                 del self.stack_labels[del_idx], self.stack_files[del_idx]
 
         self.labels_onehot = th.tensor([[1, 0], [0, 1]])
-                    
 
     def __len__(self):
         return self.num_stacks
@@ -166,7 +191,7 @@ class FindCaveImageDataset(Dataset):
         np_stack = np.load(os.path.join(self.stack_dir, self.stack_files[stack_idx]))
         stack = th.from_numpy(np_stack).float()
         label = self.labels_onehot[self.stack_labels[stack_idx]].float()
-        #label = th.tensor(self.stack_labels[stack_idx])
+        # label = th.tensor(self.stack_labels[stack_idx])
         return stack, label
 
 
@@ -180,17 +205,17 @@ def create_dataset(video_dir_cave, video_dir_expl, stack_dir):
 
 
 def train(
-        stack_dir,
-        model_dir,
-        model_name="impala",
-        data_frac=0.05,
-        validation_frac=0.5,
-        balance_classes=False,
-        num_epochs=5,
-        batch_size=16,
-        lr=0.0001,
-        report_rate=1000
-    ):
+    stack_dir,
+    model_dir,
+    model_name="impala",
+    data_frac=0.05,
+    validation_frac=0.5,
+    balance_classes=False,
+    num_epochs=5,
+    batch_size=16,
+    lr=0.0001,
+    report_rate=1000,
+):
     os.makedirs(model_dir, exist_ok=True)
 
     # only use fraction of the dataset
@@ -205,17 +230,23 @@ def train(
     # actual numbers after creating dataset (could be different due to balancing)
     num_validation_stacks = int(dataset.num_stacks * validation_frac)
     num_training_stacks = dataset.num_stacks - num_validation_stacks
-    Logging.info(f"#stacks: {dataset.num_stacks} = #training stacks: {num_training_stacks} + #validation stacks: {num_validation_stacks}")
+    Logging.info(
+        f"#stacks: {dataset.num_stacks} = #training stacks: {num_training_stacks} + #validation stacks: {num_validation_stacks}"
+    )
 
     # split into train and validation sets
     training_dataset, validation_dataset = random_split(
-       dataset,
-       [num_training_stacks, num_validation_stacks],
-       generator=th.Generator().manual_seed(42),
+        dataset,
+        [num_training_stacks, num_validation_stacks],
+        generator=th.Generator().manual_seed(42),
     )
 
-    training_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
-    validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
+    training_loader = DataLoader(
+        training_dataset, batch_size=batch_size, shuffle=True, num_workers=6
+    )
+    validation_loader = DataLoader(
+        validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6
+    )
 
     # create model, optimizer, loss function
     if model_name.lower() == "impala":
@@ -225,10 +256,10 @@ def train(
         model = FindCaveCNN().to(DEVICE)
 
     optimizer = th.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = nn.CrossEntropyLoss() # nn.BCEWithLogitsLoss()
+    loss_fn = nn.CrossEntropyLoss()  # nn.BCEWithLogitsLoss()
 
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    best_vloss = 1_000_000.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    best_vloss = 1_000_000.0
 
     for epoch in range(num_epochs):
 
@@ -243,7 +274,7 @@ def train(
 
             optimizer.zero_grad()
             # Calculate loss
-            logit_pred = model(stacks)#.squeeze()
+            logit_pred = model(stacks)  # .squeeze()
             # print("logit_pred size:", logit_pred.size())
             # print("labels size:", labels.size())
             loss = loss_fn(logit_pred, labels)
@@ -251,12 +282,14 @@ def train(
             # Backprop
             loss.backward()
             optimizer.step()
-            
+
             with th.no_grad():
                 # Calculate accuracy
-                pred = logit_pred.argmax(dim=1).long()#(logit_pred.sigmoid() > 0).long()
+                pred = logit_pred.argmax(
+                    dim=1
+                ).long()  # (logit_pred.sigmoid() > 0).long()
                 digit_labels = labels.argmax(dim=1).long()
-                #print("pred size:", pred.size())
+                # print("pred size:", pred.size())
                 correct += (pred == digit_labels).float().sum()
 
             del stacks, labels
@@ -266,7 +299,11 @@ def train(
             if i % report_rate == report_rate - 1:
                 last_loss = running_loss / report_rate
                 last_accuracy = 100 * correct / (report_rate * batch_size)
-                tqdm.write("Batch: {}, Loss: {:.4f}, Accuracy: {:.2f}".format(i + 1, last_loss, last_accuracy))
+                tqdm.write(
+                    "Batch: {}, Loss: {:.4f}, Accuracy: {:.2f}".format(
+                        i + 1, last_loss, last_accuracy
+                    )
+                )
                 running_loss = 0
                 correct = 0
         model.train(False)
@@ -278,14 +315,16 @@ def train(
                 vstacks, vlabels = vstacks.to(DEVICE), vlabels.to(DEVICE)
 
                 # Calculate loss
-                vlogit_pred = model(vstacks)#.squeeze()
-                #if vlogit_pred.size() == th.Size([]):
+                vlogit_pred = model(vstacks)  # .squeeze()
+                # if vlogit_pred.size() == th.Size([]):
                 #    vlogit_pred = vlogit_pred.unsqueeze(0)
                 vloss = loss_fn(vlogit_pred, vlabels)
                 running_vloss += vloss
 
                 # Calculate accuracy
-                vpred = vlogit_pred.argmax(dim=1).long() # (vlogit_pred.sigmoid() > 0).long()
+                vpred = vlogit_pred.argmax(
+                    dim=1
+                ).long()  # (vlogit_pred.sigmoid() > 0).long()
                 vdigit_labels = vlabels.argmax(dim=1).long()
                 vcorrect += (vpred == vdigit_labels).float().sum()
 
@@ -294,17 +333,21 @@ def train(
             avg_vloss = running_vloss / (i + 1)
             avg_accuracy = 100 * vcorrect / len(validation_dataset)
 
-        Logging.info('Loss: train {:.4f} / valid {:.4f}, Accuracy: train {:.2f} / valid {:.2f}'.format(last_loss, avg_vloss, last_accuracy, avg_accuracy))
+        Logging.info(
+            "Loss: train {:.4f} / valid {:.4f}, Accuracy: train {:.2f} / valid {:.2f}".format(
+                last_loss, avg_vloss, last_accuracy, avg_accuracy
+            )
+        )
 
         # if avg_vloss < best_vloss: # this only makes sense for many epochs
         best_vloss = avg_vloss
-        model_file = 'FindCaveCNN_{}_epoch{}.weights'.format(timestamp, epoch + 1)
+        model_file = "FindCaveCNN_{}_epoch{}.weights".format(timestamp, epoch + 1)
         model_path = os.path.join(model_dir, model_file)
         Logging.info(f"Saving model to {model_file}")
         th.save(model.state_dict(), model_path)
 
 
-def test(stack_dir, model_path, model_name, data_frac=1.):
+def test(stack_dir, model_path, model_name, data_frac=1.0):
 
     # load model
     if model_name.lower() == "impala":
@@ -315,7 +358,7 @@ def test(stack_dir, model_path, model_name, data_frac=1.):
     model.load_state_dict(th.load(model_path))
     model.to(DEVICE)
 
-    loss_fn = nn.CrossEntropyLoss() # nn.BCEWithLogitsLoss()
+    loss_fn = nn.CrossEntropyLoss()  # nn.BCEWithLogitsLoss()
 
     # hyperparameters
     balance_classes = False
@@ -333,23 +376,29 @@ def test(stack_dir, model_path, model_name, data_frac=1.):
 
     # actual numbers after creating dataset (could be different due to balancing)
     num_stacks_per_split, num_stacks_remaining = divmod(dataset.num_stacks, num_splits)
-    Logging.info(f"#stacks: {dataset.num_stacks} / #splits: {num_splits} = {num_stacks_per_split}")
-    dataset_sizes = (num_splits - 1) * [num_stacks_per_split] + [num_stacks_per_split + num_stacks_remaining]
+    Logging.info(
+        f"#stacks: {dataset.num_stacks} / #splits: {num_splits} = {num_stacks_per_split}"
+    )
+    dataset_sizes = (num_splits - 1) * [num_stacks_per_split] + [
+        num_stacks_per_split + num_stacks_remaining
+    ]
     print(dataset_sizes)
     print(sum(dataset_sizes))
 
     # split into train and validation sets
     dataset_splits = random_split(
-       dataset,
-       dataset_sizes,
-       generator=th.Generator().manual_seed(42),
+        dataset,
+        dataset_sizes,
+        generator=th.Generator().manual_seed(42),
     )
 
     for split_idx, validation_dataset in enumerate(dataset_splits):
 
         Logging.info(f"Split {split_idx + 1}")
 
-        validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
+        validation_loader = DataLoader(
+            validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6
+        )
 
         with th.no_grad():
             running_vloss = 0.0
@@ -358,14 +407,16 @@ def test(stack_dir, model_path, model_name, data_frac=1.):
                 vstacks, vlabels = vstacks.to(DEVICE), vlabels.to(DEVICE)
 
                 # Calculate loss
-                vlogit_pred = model(vstacks)#.squeeze()
-                #if vlogit_pred.size() == th.Size([]):
+                vlogit_pred = model(vstacks)  # .squeeze()
+                # if vlogit_pred.size() == th.Size([]):
                 #    vlogit_pred = vlogit_pred.unsqueeze(0)
                 vloss = loss_fn(vlogit_pred, vlabels)
                 running_vloss += vloss
 
                 # Calculate accuracy
-                vpred = vlogit_pred.argmax(dim=1).long() # (vlogit_pred.sigmoid() > 0).long()
+                vpred = vlogit_pred.argmax(
+                    dim=1
+                ).long()  # (vlogit_pred.sigmoid() > 0).long()
                 vdigit_labels = vlabels.argmax(dim=1).long()
                 vcorrect += (vpred == vdigit_labels).float().sum()
 
@@ -374,8 +425,9 @@ def test(stack_dir, model_path, model_name, data_frac=1.):
             avg_vloss = running_vloss / (i + 1)
             avg_accuracy = 100 * vcorrect / len(validation_dataset)
 
-            Logging.info('Valid loss: {:.4f}, accuracy: {:.2f}%'.format(avg_vloss, avg_accuracy))
-
+            Logging.info(
+                "Valid loss: {:.4f}, accuracy: {:.2f}%".format(avg_vloss, avg_accuracy)
+            )
 
 
 if __name__ == "__main__":
@@ -396,9 +448,9 @@ if __name__ == "__main__":
         train(
             stack_dir="/home/aicrowd/data/segments/FindCaveBrightness2/rgb_images",
             model_dir="/home/aicrowd/train",
-            model_name="impala", # either "impala" or "naturecnn"
-            data_frac=1., # fraction of data to be used
-            validation_frac=0.1, # fraction of loaded data to be used for validation
+            model_name="impala",  # either "impala" or "naturecnn"
+            data_frac=1.0,  # fraction of data to be used
+            validation_frac=0.1,  # fraction of loaded data to be used for validation
             balance_classes=False,
             num_epochs=5,
             batch_size=16,
@@ -410,10 +462,11 @@ if __name__ == "__main__":
     else:
         Logging.info("Start validation")
 
-        test(stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
+        test(
+            stack_dir="/home/aicrowd/data/segments/FindCaveBrightness/rgb_images",
             model_path="/home/aicrowd/train/FindCaveCNN_20221024_235019_epoch5.weights",
             model_name="impala",
             data_frac=0.1,
         )
-        
+
         Logging.info("Finished validation")

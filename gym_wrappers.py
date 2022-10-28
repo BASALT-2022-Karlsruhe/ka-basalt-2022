@@ -1,7 +1,7 @@
 import gym
-from gym.spaces import Box, Dict, MultiDiscrete
 import numpy as np
 import torch as th
+from gym.spaces import Box, Dict, MultiDiscrete
 
 
 class ObservationToInfos(gym.Wrapper):

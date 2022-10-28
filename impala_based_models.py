@@ -1,15 +1,15 @@
 import os
-
-import torch as th
-import torch.nn as nn
-from openai_vpt.lib.impala_cnn import ImpalaCNN
-from openai_vpt.lib.policy import ImgPreprocessing
-from openai_vpt.lib.util import FanInInitReLULayer
-from openai_vpt.agent import MineRLAgent
 from typing import Dict
 
 import gym
+import torch as th
+import torch.nn as nn
+
 from behavioural_cloning import load_model_parameters
+from openai_vpt.agent import MineRLAgent
+from openai_vpt.lib.impala_cnn import ImpalaCNN
+from openai_vpt.lib.policy import ImgPreprocessing
+from openai_vpt.lib.util import FanInInitReLULayer
 
 
 class ImpalaLinear(nn.Module):
@@ -36,7 +36,7 @@ class ImpalaLinear(nn.Module):
         elif cnn_width == 3:
             chans = (192, 384, 384)
         else:
-            raise ValueError(f"There is no VPT model with width {model_width}!")
+            raise ValueError(f"There is no VPT model with width {cnn_width}!")
         self.cnn_width = cnn_width
 
         # TODO use img_preprocess?
@@ -44,7 +44,7 @@ class ImpalaLinear(nn.Module):
         self.cnn = ImpalaCNN(
             inshape=[128, 128, 3],
             chans=chans,
-            outsize=256,
+            outsize=cnn_outsize,
             nblock=2,
             first_conv_norm=False,
             post_pool_groups=1,
@@ -65,7 +65,9 @@ class ImpalaLinear(nn.Module):
         elif len(img.shape[:-3]) == 0:
             # Need to add batch and time dimension
             img = img.unsqueeze(0).unsqueeze(0)
-        out = self.linear(self.cnn(self.img_preprocess(img)))
+        img_pre = self.img_preprocess(img)
+        cnn_out = self.cnn(img_pre)
+        out = self.linear(cnn_out)
         # Remove fictitious time dimension
         out = out.squeeze(1)
         return out
