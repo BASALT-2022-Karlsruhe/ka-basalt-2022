@@ -3,7 +3,6 @@ import subprocess
 from datetime import datetime
 
 import wandb
-
 from auto_preference_based_RL import auto_preference_based_RL_train
 from behavioural_cloning import behavioural_cloning_train
 from generate_agent_trajectories import generate_trajectories
@@ -13,7 +12,7 @@ from utils.create_videos import create_videos
 from utils.logs import Logging
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
-USE_WANDB = False
+USE_WANDB = True
 
 BC_PREFIX = "BehavioralCloning"
 PREFRL_PREFIX = "PreferenceBasedRL"
@@ -21,6 +20,8 @@ ENVS = [
     "FindCave",
 ]
 #  , "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
+
+REWARD_NET_ARCHITECTURE = "CNN"
 
 # Model and weights paths
 FOUNDATION_MODEL = "foundation-model-1x"
@@ -96,7 +97,7 @@ def main():
     pre_training()
 
     next_policy_weights_path = FOUNDATION_WEIGHTS_PATH
-    next_rewardnet_weights_path = None
+    next_rewardnet_weights_path = ""  #  PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH
 
     if BC_TRAINING:
         for env in ENVS:
@@ -113,7 +114,7 @@ def main():
             behavioural_cloning_train(
                 data_dir=EXPERT_DATA_DIR.format(env),
                 in_model=MODEL_PATH,
-                in_weights=next_policy_weights_path,
+                in_weights=next_policy_weights_path.format(env),
                 out_weights=BC_WEIGHTS_PATH.format(env),
             )
             if USE_WANDB:
@@ -126,7 +127,7 @@ def main():
 
             generate_trajectories(
                 MODEL_PATH,
-                next_policy_weights_path,
+                next_policy_weights_path.format(env),
                 env,
                 n_episodes=GENERATE_NUM_EPISODES,
                 max_steps=NUM_MAX_STEPS[i],
@@ -140,7 +141,7 @@ def main():
                     project=f"PrefRL Pretraining {env}",
                     reinit=True,
                     sync_tensorboard=True,
-                    monitor_gym=True,
+                    monitor_gym=False,
                     entity="kabasalt_team",
                 )
                 if USE_WANDB
@@ -150,14 +151,14 @@ def main():
             auto_preference_based_RL_train(
                 env_str=env,
                 in_model=MODEL_PATH,
-                in_weights_policy=next_policy_weights_path,
+                in_weights_policy=next_policy_weights_path.format(env),
                 out_weights_policy=PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH.format(env),
-                in_weights_rewardnet=next_rewardnet_weights_path,
+                in_weights_rewardnet=next_rewardnet_weights_path.format(env),
                 out_weights_rewardnet=PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH.format(
                     env,
                 ),
                 max_episode_steps=NUM_MAX_STEPS[i],
-                reward_net_arch="ImpalaCNN",
+                reward_net_arch=REWARD_NET_ARCHITECTURE,
                 expert_data=EXPERT_DATA_DIR.format(env),
                 agent_data=AGENT_DATA_DIR.format(env),
             )
@@ -179,7 +180,7 @@ def main():
                     project=f"PrefRL Training {env}",
                     reinit=True,
                     sync_tensorboard=True,
-                    monitor_gym=True,
+                    monitor_gym=False,
                     entity="kabasalt_team",
                 )
                 if USE_WANDB
@@ -194,6 +195,7 @@ def main():
                 in_weights_rewardnet=next_rewardnet_weights_path.format(env),
                 out_weights_rewardnet=PREFRL_REWARDNET_WEIGHTS_PATH.format(env),
                 max_episode_steps=NUM_MAX_STEPS[i],
+                reward_net_arch=REWARD_NET_ARCHITECTURE,
             )
             if USE_WANDB:
                 run.finish()
@@ -211,4 +213,9 @@ def main():
 
 
 if __name__ == "__main__":
+    
+    from pyvirtualdisplay import Display
+
+    disp = Display().start()
     main()
+    disp.end()
