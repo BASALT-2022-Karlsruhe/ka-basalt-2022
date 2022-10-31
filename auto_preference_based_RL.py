@@ -15,7 +15,7 @@ from imitation.rewards.reward_wrapper import MineRLRewardVecEnvWrapper
 from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
-from stable_baselines3.common.vec_env import VecVideoRecorder
+from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
 from stable_baselines3.ppo.ppo import PPO
 from wandb.integration.sb3 import WandbCallback
 
@@ -70,7 +70,7 @@ def auto_preference_based_RL_train(
     n_epochs_reward_model = 5
     batch_size_reward_model = 32
     lr_reward_model = 0.001
-    n_comparisons = 500
+    n_comparisons = 1000
     fragment_length = 60
 
     # PPO
@@ -80,6 +80,9 @@ def auto_preference_based_RL_train(
     lr_ppo = 0.0003
     batch_size_ppo = 128
     ent_coef_ppo = 0.01
+    # linear lr annealing (p = 1 - steps/n_total_steps)
+    lr_schedule = lambda p: lr_ppo * p
+
 
     if use_wandb:
         # Setup W&B config
@@ -207,6 +210,7 @@ def auto_preference_based_RL_train(
 
     # Endow the environment with the learned reward function
     venv = MineRLRewardVecEnvWrapper(venv, reward_net.predict_processed)
+    venv = VecMonitor(venv)
 
     # Setup RL algorithm
     algorithm = PPO(
@@ -214,13 +218,15 @@ def auto_preference_based_RL_train(
         policy_kwargs={
             "minerl_agent": minerl_agent,
             "optimizer_class": th.optim.Adam,
+            # https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/
+            "optimizer_kwargs": {"eps": 1e-5}
         },
         env=venv,
         seed=0,
         n_steps=n_steps_ppo // venv.num_envs,
         batch_size=batch_size_ppo,
         ent_coef=ent_coef_ppo,
-        learning_rate=lr_ppo,
+        learning_rate=lr_schedule,
         n_epochs=n_epochs_ppo,
         device=device,
         verbose=1,
