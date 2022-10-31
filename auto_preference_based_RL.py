@@ -10,10 +10,11 @@ import numpy as np
 import torch as th
 from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import (CnnRewardNet, NormalizedRewardNet,
-                                           RewardNet, cnn_transpose)
+                                           RewardNet)
 from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
+from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.ppo.ppo import PPO
 from wandb.integration.sb3 import WandbCallback
 
@@ -58,29 +59,29 @@ def auto_preference_based_RL_train(
     agent_data,
 ):
     """Training workflow for auto-labelled preference-based RL."""
+    use_wandb = wandb.run is not None
     skip_reward_training = False
     # Hyperparameters
 
     seed = 0
 
     # Reward model training
-    n_epochs_reward_model = 10
+    n_epochs_reward_model = 20
     batch_size_reward_model = 32
     lr_reward_model = 0.001
-    n_comparisons = 500
-    fragment_length = 40
+    n_comparisons = 1000
+    fragment_length = 100
 
     # PPO
-    n_total_steps_ppo = 50000
+    n_total_steps_ppo = 100000
     n_epochs_ppo = 3
     n_steps_ppo = 512
     lr_ppo = 0.0003
-    batch_size_ppo = 64
+    batch_size_ppo = 128
     ent_coef_ppo = 0.01
 
-    # Setup W&B config
-    callback = None
-    if wandb.run is not None:
+    if use_wandb:
+        # Setup W&B config
         wandb.config.seed = seed
 
         wandb.config.reward_net_arch = reward_net_arch
@@ -90,18 +91,11 @@ def auto_preference_based_RL_train(
         wandb.config.n_comparisons = n_comparisons
         wandb.config.fragment_length = fragment_length
 
-        wandb.config.n_steps_ppo = n_steps_ppo
-        wandb.config.batch_size_ppo = batch_size_ppo
-        wandb.config.ent_coef_ppo = ent_coef_ppo
-        wandb.config.learning_rate_ppo = lr_ppo
-        wandb.config.n_epochs_ppo = n_epochs_ppo
-        wandb.config.n_total_steps_ppo = n_total_steps_ppo
-
-        callback = WandbCallback()
-
     # Setup logger
-    logger = imit_logger.configure("train/logs", ["wandb"])
-    print(logger)
+    logger = imit_logger.configure(
+        "train/logs", 
+        ["stdout", "log", "json", "wandb"]
+    )
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
@@ -141,8 +135,15 @@ def auto_preference_based_RL_train(
         max_episode_steps=max_episode_steps,
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
+    if use_wandb:
+        venv = VecVideoRecorder(
+            venv,
+            f"train/videos/{wandb.run.id}",
+            record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=400,
+        )
 
-    if skip_reward_training:
+    if not skip_reward_training:
 
         # Create trajectory generators
         expert_generator = preference_comparisons.FromVideoTrajectoryGenerator(
@@ -176,12 +177,12 @@ def auto_preference_based_RL_train(
         reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
     else:
         raise ValueError(f"Unkown reward network architecture: {reward_net_arch}")
+    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     if in_weights_rewardnet is not None and os.path.isfile(in_weights_rewardnet):
         reward_net.load_state_dict(th.load(in_weights_rewardnet))
-    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(reward_net)
 
-    if skip_reward_training:
+    if not skip_reward_training:
         # Setup reward trainer
         reward_trainer = preference_comparisons.BasicRewardTrainer(
             model=reward_net,
@@ -214,13 +215,20 @@ def auto_preference_based_RL_train(
         ent_coef=ent_coef_ppo,
         learning_rate=lr_ppo,
         n_epochs=n_epochs_ppo,
-        device="auto",
+        device=device,
         verbose=1,
-        #tensorboard_log=f"runs",
+        tensorboard_log=f"train/runs/{wandb.run.id}" if use_wandb else None,
     )
 
     # Train agent
-    algorithm.learn(total_timesteps=n_total_steps_ppo, callback=callback)
+    algorithm.learn(
+        total_timesteps=n_total_steps_ppo,
+        callback=WandbCallback(
+            gradient_save_freq=100,
+            model_save_path=f"train/models/{wandb.run.id}",
+            verbose=2
+        ) if use_wandb else None,
+    )
 
     venv.close()
 
