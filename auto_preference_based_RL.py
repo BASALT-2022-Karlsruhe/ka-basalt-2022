@@ -11,6 +11,7 @@ import torch as th
 from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import (CnnRewardNet, NormalizedRewardNet,
                                            RewardNet)
+from imitation.rewards.reward_wrapper import MineRLRewardVecEnvWrapper
 from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
@@ -60,17 +61,17 @@ def auto_preference_based_RL_train(
 ):
     """Training workflow for auto-labelled preference-based RL."""
     use_wandb = wandb.run is not None
-    skip_reward_training = False
+    skip_reward_training = True
     # Hyperparameters
 
     seed = 0
 
     # Reward model training
-    n_epochs_reward_model = 20
+    n_epochs_reward_model = 5
     batch_size_reward_model = 32
     lr_reward_model = 0.001
-    n_comparisons = 1000
-    fragment_length = 100
+    n_comparisons = 500
+    fragment_length = 60
 
     # PPO
     n_total_steps_ppo = 100000
@@ -93,9 +94,10 @@ def auto_preference_based_RL_train(
 
     # Setup logger
     logger = imit_logger.configure(
-        "train/logs", 
+        "train/logs",
         ["stdout", "log", "json", "wandb"]
     )
+    #logger, log_dir = common.setup_logging()
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
@@ -143,6 +145,21 @@ def auto_preference_based_RL_train(
             video_length=400,
         )
 
+    # Define reward model
+    image_obs_space = spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
+    if reward_net_arch == "CNN":
+        reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
+    elif reward_net_arch == "ImpalaCNN":
+        reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
+    else:
+        raise ValueError(f"Unkown reward network architecture: {reward_net_arch}")
+    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
+    if in_weights_rewardnet is not None and os.path.isfile(in_weights_rewardnet):
+        reward_net.load_state_dict(th.load(in_weights_rewardnet))
+    # Move reward model to GPU if possible
+    reward_net.to(device)
+    preference_model = preference_comparisons.PreferenceModel(reward_net)
+
     if not skip_reward_training:
 
         # Create trajectory generators
@@ -169,19 +186,6 @@ def auto_preference_based_RL_train(
         # Add comparisons to the dataset
         dataset.push(num_samples=n_comparisons)
 
-    # Define reward model
-    image_obs_space = spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
-    if reward_net_arch == "CNN":
-        reward_net = CnnRewardNet(image_obs_space, venv.action_space, use_action=False)
-    elif reward_net_arch == "ImpalaCNN":
-        reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
-    else:
-        raise ValueError(f"Unkown reward network architecture: {reward_net_arch}")
-    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
-    if in_weights_rewardnet is not None and os.path.isfile(in_weights_rewardnet):
-        reward_net.load_state_dict(th.load(in_weights_rewardnet))
-    preference_model = preference_comparisons.PreferenceModel(reward_net)
-
     if not skip_reward_training:
         # Setup reward trainer
         reward_trainer = preference_comparisons.BasicRewardTrainer(
@@ -200,6 +204,9 @@ def auto_preference_based_RL_train(
         reward_accuracy = logger.name_to_value["mean/reward/accuracy"]
 
         print(f"Reward loss {reward_loss}, reward accuracy: {reward_accuracy}")
+
+    # Endow the environment with the learned reward function
+    venv = MineRLRewardVecEnvWrapper(venv, reward_net.predict_processed)
 
     # Setup RL algorithm
     algorithm = PPO(
