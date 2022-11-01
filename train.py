@@ -13,18 +13,21 @@ from utils.logs import Logging
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 USE_WANDB = True
+WANDB_LOG_DIR = "train/wandb"
 
 BC_PREFIX = "BehavioralCloning"
 PREFRL_PREFIX = "PreferenceBasedRL"
 ENVS = [
     "FindCave",
+    "MakeWaterfall",
+    "CreateVillageAnimalPen",
+    "BuildVillageHouse"
 ]
-#  , "MakeWaterfall", "CreateVillageAnimalPen", "BuildVillageHouse"]
 
-REWARD_NET_ARCHITECTURE = "CNN"
+REWARD_NET_ARCHITECTURE = "ImpalaCNN"
 
 # Model and weights paths
-FOUNDATION_MODEL = "foundation-model-1x"
+FOUNDATION_MODEL = "foundation-model-2x"
 MODEL_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.model"
 FOUNDATION_WEIGHTS_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
 
@@ -42,7 +45,7 @@ ESC_WEIGHTS_PATHS = []
 
 # Trajectory data dirs
 EXPERT_DATA_DIR = "data/MineRLBasalt{}-v0"
-AGENT_DATA_DIR = "data/agent/MineRLBasalt{}-v0"
+AGENT_DATA_DIR = f"data/{FOUNDATION_MODEL}/MineRLBasalt{{}}-v0"
 
 # Control training components
 BC_TRAINING = False
@@ -51,7 +54,7 @@ PREFRL_PRETRAINING = True
 PREFRL_TRAINING = False
 
 # Training parameters
-GENERATE_NUM_EPISODES = 10
+GENERATE_NUM_EPISODES = 50
 ESC_MODELS = []
 NUM_EVAL_VIDEOS = 5
 NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
@@ -71,24 +74,25 @@ def post_training(policy_weights_path):
     Args:
         policy_weights_path (str): Path to trained policy weights
     """
-    for i, env in enumerate(ENVS):
-        Logging.info(f"===Creating evaluation videos for {env}===")
+    if NUM_EVAL_VIDEOS > 0:
+        for i, env in enumerate(ENVS):
+            Logging.info(f"===Creating evaluation videos for {env}===")
 
-        esc_weights_path = None
-        try:
-            esc_weights_path = ESC_WEIGHTS_PATHS[i]
-        except IndexError:
-            Logging.info("No ESC model available.")
+            esc_weights_path = None
+            try:
+                esc_weights_path = ESC_WEIGHTS_PATHS[i]
+            except IndexError:
+                Logging.info("No ESC model available.")
 
-        create_videos(
-            policy_weights_path.format(env),
-            esc_weights_path,
-            env,
-            FOUNDATION_MODEL,
-            NUM_EVAL_VIDEOS,
-            NUM_MAX_STEPS[i],
-            show=False,
-        )
+            create_videos(
+                policy_weights_path.format(env),
+                esc_weights_path,
+                env,
+                FOUNDATION_MODEL,
+                NUM_EVAL_VIDEOS,
+                NUM_MAX_STEPS[i],
+                show=False,
+            )
     Logging.info("End training")
 
 
@@ -97,7 +101,7 @@ def main():
     pre_training()
 
     next_policy_weights_path = FOUNDATION_WEIGHTS_PATH
-    next_rewardnet_weights_path = ""  #  PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH
+    next_rewardnet_weights_path = ""
 
     if BC_TRAINING:
         for env in ENVS:
@@ -106,6 +110,7 @@ def main():
                     project=f"BC Training {env}",
                     reinit=True,
                     entity="kabasalt_team",
+                    dir=WANDB_LOG_DIR,
                 )
                 if USE_WANDB
                 else None
@@ -141,8 +146,9 @@ def main():
                     project=f"PrefRL Pretraining {env}",
                     reinit=True,
                     sync_tensorboard=True,
-                    monitor_gym=False,
+                    monitor_gym=True,
                     entity="kabasalt_team",
+                    dir=WANDB_LOG_DIR,
                 )
                 if USE_WANDB
                 else None
@@ -180,8 +186,9 @@ def main():
                     project=f"PrefRL Training {env}",
                     reinit=True,
                     sync_tensorboard=True,
-                    monitor_gym=False,
+                    monitor_gym=True,
                     entity="kabasalt_team",
+                    dir=WANDB_LOG_DIR,
                 )
                 if USE_WANDB
                 else None
@@ -213,9 +220,8 @@ def main():
 
 
 if __name__ == "__main__":
-    
     from pyvirtualdisplay import Display
 
     disp = Display().start()
     main()
-    disp.end()
+    disp.stop()
