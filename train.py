@@ -43,6 +43,9 @@ PREFRL_REWARDNET_WEIGHTS_PATH = f"train/{PREFRL_PREFIX}{{}}_RewardNet.weights"
 
 ESC_WEIGHTS_PATHS = []
 
+# Weights to be used in the submission
+SUBMISSION_WEIGHTS_PATH = PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH
+
 # Trajectory data dirs
 EXPERT_DATA_DIR = "data/MineRLBasalt{}-v0"
 AGENT_DATA_DIR = f"data/{FOUNDATION_MODEL}/MineRLBasalt{{}}-v0"

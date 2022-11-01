@@ -1,21 +1,56 @@
-from run_agent import main as run_agent_main
+import logging
+import pickle
+
+import aicrowd_gym
+import coloredlogs
+import minerl
+
 from config import EVAL_EPISODES, EVAL_MAX_STEPS
-from pathlib import Path
+from openai_vpt.agent import MineRLAgent
+from train import FOUNDATION_MODEL, SUBMISSION_WEIGHTS_PATH
+
+coloredlogs.install(logging.DEBUG)
+
+
+ENV_STRING = "CreateVillageAnimalPen"
+MINERL_GYM_ENV = f'MineRLBasalt{ENV_STRING}-v0'
 
 
 def main():
-    video_dir = Path("./train/videos/create_village_animal_pen")
-    video_dir.mkdir(parents=True, exist_ok=True)
-    run_agent_main(
-        model="data/VPT-models/foundation-model-1x.model",
-        weights="train/MineRLBasaltCreateVillageAnimalPen.weights",
-        env="MineRLBasaltCreateVillageAnimalPen-v0",
-        n_episodes=EVAL_EPISODES,
-        max_steps=EVAL_MAX_STEPS,
-        video_dir=str(video_dir.absolute()),
-        show=False,
-        record=False
-    )
+    # NOTE: It is important that you use "aicrowd_gym" instead of regular "gym"!
+    #       Otherwise, your submission will fail.
+    env = aicrowd_gym.make(MINERL_GYM_ENV)
+
+    # Load your model here
+    # NOTE: The trained parameters must be inside "train" directory!
+    model = f"data/VPT-models/{FOUNDATION_MODEL}.model"
+    weights = SUBMISSION_WEIGHTS_PATH.format(ENV_STRING)
+    agent_parameters = pickle.load(open(model, "rb"))
+    policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
+    pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
+    pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
+    agent = MineRLAgent(env, policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs)
+    agent.load_weights(weights)
+
+    for i in range(EVAL_EPISODES):
+        agent.reset()
+        obs = env.reset()
+        done = False
+        for step_counter in range(EVAL_MAX_STEPS):
+            
+            action = agent.get_action(obs)
+
+            obs, reward, done, info = env.step(action)
+
+            if done:
+                break
+        print(f"[{i}] Episode complete")
+
+    # Close environment and clean up any bigger memory hogs.
+    # Otherwise, you might start running into memory issues
+    # on the evaluation server.
+    env.close()
+
 
 if __name__ == '__main__':
     main()
