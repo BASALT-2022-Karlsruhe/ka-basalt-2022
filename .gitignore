@@ -6,6 +6,10 @@ docker-compose.override.yaml
 Dockerfile-full
 
 demo_segmentation/example_segmentations
+videos
+runs
+models
+wandb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
