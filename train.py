@@ -103,7 +103,7 @@ def post_training(policy_weights_path):
                 env,
                 FOUNDATION_MODEL,
                 NUM_EVAL_VIDEOS,
-                NUM_MAX_STEPS[i],
+                NUM_MAX_STEPS[env],
                 show=False,
             )
     Logging.info("End training")
