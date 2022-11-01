@@ -39,6 +39,7 @@ def main():
         for step_counter in range(EVAL_MAX_STEPS):
             
             action = agent.get_action(obs)
+            action["ESC"] = 0
 
             obs, reward, done, info = env.step(action)
 

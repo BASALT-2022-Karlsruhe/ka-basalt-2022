@@ -12,7 +12,7 @@ from train import FOUNDATION_MODEL, SUBMISSION_WEIGHTS_PATH
 coloredlogs.install(logging.DEBUG)
 
 ENV_STRING = "MakeWaterfall"
-MINERL_GYM_ENV = f'MineRLBasalt{ENV_STRING}-v0'v
+MINERL_GYM_ENV = f'MineRLBasalt{ENV_STRING}-v0'
 
 
 def main():
@@ -38,6 +38,7 @@ def main():
         for step_counter in range(EVAL_MAX_STEPS):
             
             action = agent.get_action(obs)
+            action["ESC"] = 0
 
             obs, reward, done, info = env.step(action)
 
