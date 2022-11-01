@@ -1,15 +1,15 @@
 # Code for loading OpenAI MineRL VPT datasets
 # (NOTE: Not the original code!)
-import json
 import glob
+import json
 import os
 import random
-from multiprocessing import Process, Queue, Event
+from multiprocessing import Event, Process, Queue
 
-import numpy as np
 import cv2
+import numpy as np
 
-from openai_vpt.agent import resize_image, AGENT_RESOLUTION
+from openai_vpt.agent import AGENT_RESOLUTION, resize_image
 
 QUEUE_TIMEOUT = 10
 
@@ -114,6 +114,7 @@ def env_action_to_json_action(env_action, prev_json_action=None):
     )
     prev_gui_open = prev_json_action["isGuiOpen"] if prev_json_action else False
     json_action["isGuiOpen"] = e_pressed != prev_gui_open
+    gui_was_opened_or_closed = prev_gui_open != json_action["isGuiOpen"]
 
     # process keyboard actions
     for key, json_key in INV_KEYBOARD_BUTTON_MAPPING.items():
@@ -137,16 +138,28 @@ def env_action_to_json_action(env_action, prev_json_action=None):
     camera_action = env_action["camera"][0]
     json_action["mouse"]["dy"] = round(camera_action[0] / CAMERA_SCALER)
     json_action["mouse"]["dx"] = round(camera_action[1] / CAMERA_SCALER)
-    json_action["mouse"]["x"] = (
-        prev_json_action["mouse"]["x"] + prev_json_action["mouse"]["dx"]
-        if prev_json_action
-        else 640.0
-    )
-    json_action["mouse"]["y"] = (
-        prev_json_action["mouse"]["y"] + prev_json_action["mouse"]["dy"]
-        if prev_json_action
-        else 360.0
-    )
+
+    if gui_was_opened_or_closed:
+        # reset mouse coords
+        json_action["mouse"]["x"] = 640.0
+        json_action["mouse"]["y"] = 360.0
+    else:
+        # normal mouse coord update
+        json_action["mouse"]["x"] = (
+            prev_json_action["mouse"]["x"] + prev_json_action["mouse"]["dx"]
+            if prev_json_action
+            else 640.0
+        )
+        json_action["mouse"]["y"] = (
+            prev_json_action["mouse"]["y"] + prev_json_action["mouse"]["dy"]
+            if prev_json_action
+            else 360.0
+        )
+
+    # make sure coordinates are not out of bounds when GUI is open
+    if json_action["isGuiOpen"]:
+        json_action["mouse"]["x"] = max(0.0, min(json_action["mouse"]["x"], 640.0))
+        json_action["mouse"]["y"] = max(0.0, min(json_action["mouse"]["x"], 360.0))
 
     buttons = ["attack", "use", "pickItem"]
     for i, button in enumerate(buttons):

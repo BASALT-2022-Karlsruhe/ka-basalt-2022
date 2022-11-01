@@ -9,12 +9,8 @@ import minerl  # noqa
 import numpy as np
 import torch as th
 from imitation.algorithms import preference_comparisons
-from imitation.rewards.reward_nets import (
-    CnnRewardNet,
-    NormalizedRewardNet,
-    RewardNet,
-    cnn_transpose,
-)
+from imitation.rewards.reward_nets import (CnnRewardNet, NormalizedRewardNet,
+                                           RewardNet, cnn_transpose)
 from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
@@ -62,22 +58,25 @@ def auto_preference_based_RL_train(
     agent_data,
 ):
     """Training workflow for auto-labelled preference-based RL."""
+    skip_reward_training = False
     # Hyperparameters
 
     seed = 0
 
     # Reward model training
-    n_epochs_reward_model = 3
-    n_comparisons = 10
-    fragment_length = 10
+    n_epochs_reward_model = 10
+    batch_size_reward_model = 32
+    lr_reward_model = 0.001
+    n_comparisons = 500
+    fragment_length = 40
 
     # PPO
-    n_total_steps_ppo = 30
-    n_epochs_ppo = 1
-    n_steps_ppo = 10
+    n_total_steps_ppo = 50000
+    n_epochs_ppo = 3
+    n_steps_ppo = 512
     lr_ppo = 0.0003
-    batch_size_ppo = 10
-    ent_coef_ppo = 0.0
+    batch_size_ppo = 64
+    ent_coef_ppo = 0.01
 
     # Setup W&B config
     callback = None
@@ -86,6 +85,10 @@ def auto_preference_based_RL_train(
 
         wandb.config.reward_net_arch = reward_net_arch
         wandb.config.n_epochs_reward_model = n_epochs_reward_model
+        wandb.config.batch_size_reward_model = batch_size_reward_model
+        wandb.config.lr_reward_model = lr_reward_model
+        wandb.config.n_comparisons = n_comparisons
+        wandb.config.fragment_length = fragment_length
 
         wandb.config.n_steps_ppo = n_steps_ppo
         wandb.config.batch_size_ppo = batch_size_ppo
@@ -97,7 +100,8 @@ def auto_preference_based_RL_train(
         callback = WandbCallback()
 
     # Setup logger
-    logger = imit_logger.configure()
+    logger = imit_logger.configure("train/logs", ["wandb"])
+    print(logger)
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
@@ -138,29 +142,31 @@ def auto_preference_based_RL_train(
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
 
-    # Create trajectory generators
-    expert_generator = preference_comparisons.FromVideoTrajectoryGenerator(
-        expert_data,
-        minerl_agent,
-        seed=seed,
-        custom_logger=logger,
-    )
-    agent_generator = preference_comparisons.FromVideoTrajectoryGenerator(
-        agent_data,
-        minerl_agent,
-        seed=seed,
-        custom_logger=logger,
-    )
+    if skip_reward_training:
 
-    # Load dataset
-    dataset = preference_comparisons.AutoPreferenceDataset(
-        expert_generator,
-        agent_generator,
-        fragment_length,
-    )
+        # Create trajectory generators
+        expert_generator = preference_comparisons.FromVideoTrajectoryGenerator(
+            expert_data,
+            minerl_agent,
+            seed=seed,
+            custom_logger=logger,
+        )
+        agent_generator = preference_comparisons.FromVideoTrajectoryGenerator(
+            agent_data,
+            minerl_agent,
+            seed=seed,
+            custom_logger=logger,
+        )
 
-    # Add comparisons to the dataset
-    dataset.push(num_samples=n_comparisons)
+        # Load dataset
+        dataset = preference_comparisons.AutoPreferenceDataset(
+            expert_generator,
+            agent_generator,
+            fragment_length,
+        )
+
+        # Add comparisons to the dataset
+        dataset.push(num_samples=n_comparisons)
 
     # Define reward model
     image_obs_space = spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
@@ -175,21 +181,24 @@ def auto_preference_based_RL_train(
     reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     preference_model = preference_comparisons.PreferenceModel(reward_net)
 
-    # Setup reward trainer
-    reward_trainer = preference_comparisons.BasicRewardTrainer(
-        model=reward_net,
-        loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
-        epochs=n_epochs_reward_model,
-        custom_logger=logger,
-    )
+    if skip_reward_training:
+        # Setup reward trainer
+        reward_trainer = preference_comparisons.BasicRewardTrainer(
+            model=reward_net,
+            loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
+            epochs=n_epochs_reward_model,
+            batch_size=batch_size_reward_model,
+            lr=lr_reward_model,
+            custom_logger=logger,
+        )
 
-    # Train the reward model
-    with logger.accumulate_means("reward"):
-        reward_trainer.train(dataset)
-    reward_loss = logger.name_to_value["mean/reward/loss"]
-    reward_accuracy = logger.name_to_value["mean/reward/accuracy"]
+        # Train the reward model
+        with logger.accumulate_means("reward"):
+            reward_trainer.train(dataset)
+        reward_loss = logger.name_to_value["mean/reward/loss"]
+        reward_accuracy = logger.name_to_value["mean/reward/accuracy"]
 
-    print(f"Reward loss {reward_loss}, reward accuracy: {reward_accuracy}")
+        print(f"Reward loss {reward_loss}, reward accuracy: {reward_accuracy}")
 
     # Setup RL algorithm
     algorithm = PPO(
@@ -207,6 +216,7 @@ def auto_preference_based_RL_train(
         n_epochs=n_epochs_ppo,
         device="auto",
         verbose=1,
+        #tensorboard_log=f"runs",
     )
 
     # Train agent
