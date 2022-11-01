@@ -1,6 +1,5 @@
 import gym
 from gym.envs.registration import register
-from stable_baselines3.common.monitor import Monitor
 
 from gym_wrappers import (DictToMultiDiscreteActionSpace,
                           HiddenStateObservationSpace, ObservationToCPU,
@@ -15,7 +14,6 @@ def sb3_minerl_findcave_env(minerl_agent):
     sb3_env = DictToMultiDiscreteActionSpace(sb3_env, minerl_agent)
     sb3_env = HiddenStateObservationSpace(sb3_env, minerl_agent)
     sb3_env = ObservationToCPU(sb3_env)
-    sb3_env = Monitor(sb3_env)
 
     # enable video recording
     sb3_env.metadata["render.modes"] = ["rgb_array", "ansi"]
@@ -31,7 +29,6 @@ def sb3_minerl_makewaterfall_env(minerl_agent):
     sb3_env = DictToMultiDiscreteActionSpace(sb3_env, minerl_agent)
     sb3_env = HiddenStateObservationSpace(sb3_env, minerl_agent)
     sb3_env = ObservationToCPU(sb3_env)
-    sb3_env = Monitor(sb3_env)
 
     # enable video recording
     sb3_env.metadata["render.modes"] = ["rgb_array", "ansi"]
@@ -47,7 +44,6 @@ def sb3_minerl_buildvillagehouse_env(minerl_agent):
     sb3_env = DictToMultiDiscreteActionSpace(sb3_env, minerl_agent)
     sb3_env = HiddenStateObservationSpace(sb3_env, minerl_agent)
     sb3_env = ObservationToCPU(sb3_env)
-    sb3_env = Monitor(sb3_env)
 
     # enable video recording
     sb3_env.metadata["render.modes"] = ["rgb_array", "ansi"]
@@ -63,7 +59,6 @@ def sb3_minerl_createvillageanimalpen_env(minerl_agent):
     sb3_env = DictToMultiDiscreteActionSpace(sb3_env, minerl_agent)
     sb3_env = HiddenStateObservationSpace(sb3_env, minerl_agent)
     sb3_env = ObservationToCPU(sb3_env)
-    sb3_env = Monitor(sb3_env)
     
     # enable video recording
     sb3_env.metadata["render.modes"] = ["rgb_array", "ansi"]
