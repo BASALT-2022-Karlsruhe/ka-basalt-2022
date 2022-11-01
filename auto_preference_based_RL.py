@@ -1,6 +1,5 @@
 """Training script for auto-laballed preference-based RL."""
 import os
-import pickle
 from argparse import ArgumentParser
 
 import gym
@@ -9,11 +8,9 @@ import minerl  # noqa
 import numpy as np
 import torch as th
 from imitation.algorithms import preference_comparisons
-from imitation.rewards.reward_nets import (CnnRewardNet, NormalizedRewardNet,
-                                           RewardNet)
+from imitation.rewards.reward_nets import CnnRewardNet, NormalizedRewardNet
 from imitation.rewards.reward_wrapper import MineRLRewardVecEnvWrapper
 from imitation.util import logger as imit_logger
-from imitation.util import networks
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
 from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
@@ -22,49 +19,10 @@ from wandb.integration.sb3 import WandbCallback
 
 import sb3_minerl_envs  # noqa
 import wandb
-from impala_based_models import ImpalaRegressor
+from impala_based_models import ImpalaRewardNet
 from openai_vpt.agent import MineRLAgent
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
-
-
-class ImpalaRewardNet(RewardNet):
-    """Reward network based on the ImpalaCNN."""
-
-    def __init__(self, observation_space, action_space, model_width=1):
-        super().__init__(observation_space, action_space)
-        self.net = ImpalaRegressor(cnn_width=model_width)
-
-    def forward(self, state, action, next_state, done):
-        rewards = self.net(state).squeeze()
-        return rewards
-
-    def predict_th(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        next_state: np.ndarray,
-        done: np.ndarray,
-    ) -> th.Tensor:
-        with networks.evaluating(self):
-            state_th, action_th, next_state_th, done_th = self.preprocess(
-                state,
-                action,
-                next_state,
-                done,
-            )
-            with th.no_grad():
-                rew_th = self(state_th, action_th, next_state_th, done_th).unsqueeze(0)
-            assert rew_th.shape == state.shape[:1]
-        return rew_th
-
-
-def load_model_parameters(path_to_model_file):
-    """Load VPT model params."""
-    agent_parameters = pickle.load(open(path_to_model_file, "rb"))
-    policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
-    pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
-    pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
-    return policy_kwargs, pi_head_kwargs
+from utils.utils import load_model_parameters
 
 
 def auto_preference_based_RL_train(
@@ -90,20 +48,19 @@ def auto_preference_based_RL_train(
     n_epochs_reward_model = 3
     batch_size_reward_model = 8
     lr_reward_model = 0.001
-    n_comparisons = 1000 # 5k takes ~3h per epoch with ImpalaCNN
-    fragment_length = 40 # max frames per batch ~ 300 to fit on 16GB RAM
+    n_comparisons = 1000  # 5k takes ~3h per epoch with ImpalaCNN
+    fragment_length = 40  # max frames per batch ~ 300 to fit on 16GB RAM
     discount_factor = 0.99
 
     # PPO
     n_total_steps_ppo = 200000
     n_epochs_ppo = 3
     n_steps_ppo = 512
-    lr_ppo = 0.0003
+    lr_ppo = 0.000181
     batch_size_ppo = 128
     ent_coef_ppo = 0.01
     # linear lr annealing (p = 1 - steps/n_total_steps)
     lr_schedule = lambda p: lr_ppo * p
-
 
     if use_wandb:
         # Setup W&B config
@@ -125,7 +82,7 @@ def auto_preference_based_RL_train(
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
-    # TODO change to aicrowd_gym for submission
+    
     env = gym.make(minerl_env_str + "-v0")
 
     # Setup MineRL agent
@@ -176,7 +133,7 @@ def auto_preference_based_RL_train(
     elif reward_net_arch == "ImpalaCNN":
         reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
     else:
-        raise ValueError(f"Unkown reward network architecture: {reward_net_arch}")
+        raise ValueError(f"Unknown reward network architecture: {reward_net_arch}")
     reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     if in_weights_rewardnet is not None and os.path.isfile(in_weights_rewardnet):
         reward_net.load_state_dict(th.load(in_weights_rewardnet))
@@ -242,7 +199,7 @@ def auto_preference_based_RL_train(
         policy_kwargs={
             "minerl_agent": minerl_agent,
             "optimizer_class": th.optim.Adam,
-            # https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/
+            # see https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/
             "optimizer_kwargs": {"eps": 1e-5}
         },
         env=venv,

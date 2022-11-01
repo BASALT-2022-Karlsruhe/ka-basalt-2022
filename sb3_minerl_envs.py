@@ -1,3 +1,4 @@
+import aicrowd_gym
 import gym
 from gym.envs.registration import register
 
@@ -7,7 +8,7 @@ from gym_wrappers import (DictToMultiDiscreteActionSpace,
 
 
 def sb3_minerl_findcave_env(minerl_agent):
-    env = gym.make("MineRLBasaltFindCave-v0")
+    env = aicrowd_gym.make("MineRLBasaltFindCave-v0")
 
     # Make env compatible with SB3
     sb3_env = ObservationToInfos(env)
@@ -22,7 +23,7 @@ def sb3_minerl_findcave_env(minerl_agent):
 
 
 def sb3_minerl_makewaterfall_env(minerl_agent):
-    env = gym.make("MineRLBasaltMakeWaterfall-v0")
+    env = aicrowd_gym.make("MineRLBasaltMakeWaterfall-v0")
 
     # Make env compatible with SB3
     sb3_env = ObservationToInfos(env)
@@ -37,7 +38,7 @@ def sb3_minerl_makewaterfall_env(minerl_agent):
 
 
 def sb3_minerl_buildvillagehouse_env(minerl_agent):
-    env = gym.make("MineRLBasaltBuildVillageHouse-v0")
+    env = aicrowd_gym.make("MineRLBasaltBuildVillageHouse-v0")
 
     # Make env compatible with SB3
     sb3_env = ObservationToInfos(env)
@@ -52,7 +53,7 @@ def sb3_minerl_buildvillagehouse_env(minerl_agent):
 
 
 def sb3_minerl_createvillageanimalpen_env(minerl_agent):
-    env = gym.make("MineRLBasaltCreateVillageAnimalPen-v0")
+    env = aicrowd_gym.make("MineRLBasaltCreateVillageAnimalPen-v0")
 
     # Make env compatible with SB3
     sb3_env = ObservationToInfos(env)

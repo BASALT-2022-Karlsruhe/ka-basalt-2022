@@ -1,9 +1,11 @@
 import os
-from typing import Dict
 
 import gym
+import numpy as np
 import torch as th
 import torch.nn as nn
+from imitation.rewards.reward_nets import RewardNet
+from imitation.util import networks
 
 from behavioural_cloning import load_model_parameters
 from openai_vpt.agent import MineRLAgent
@@ -124,6 +126,37 @@ class ImpalaRegressor(nn.Module):
 
     def forward(self, obs):
         return self.out_linear(self.impala_linear(obs))
+
+
+class ImpalaRewardNet(RewardNet):
+    """Reward network based on the ImpalaCNN."""
+
+    def __init__(self, observation_space, action_space, model_width=1):
+        super().__init__(observation_space, action_space)
+        self.net = ImpalaRegressor(cnn_width=model_width)
+
+    def forward(self, state, action, next_state, done):
+        rewards = self.net(state).squeeze()
+        return rewards
+
+    def predict_th(
+        self,
+        state: np.ndarray,
+        action: np.ndarray,
+        next_state: np.ndarray,
+        done: np.ndarray,
+    ) -> th.Tensor:
+        with networks.evaluating(self):
+            state_th, action_th, next_state_th, done_th = self.preprocess(
+                state,
+                action,
+                next_state,
+                done,
+            )
+            with th.no_grad():
+                rew_th = self(state_th, action_th, next_state_th, done_th).unsqueeze(0)
+            assert rew_th.shape == state.shape[:1]
+        return rew_th
 
 
 def save_impala_cnn_weights(model_width=1):
