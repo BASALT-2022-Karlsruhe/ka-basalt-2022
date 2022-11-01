@@ -6,8 +6,11 @@ docker-compose.override.yaml
 Dockerfile-full
 
 demo_segmentation/example_segmentations
-train
+videos
+runs
+models
 wandb
+train
 .viminfo
 
 # Byte-compiled / optimized / DLL files
