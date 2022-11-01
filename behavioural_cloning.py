@@ -4,19 +4,19 @@
 #       This will fit inside even smaller GPUs (tested on 8GB one),
 #       but is slow.
 
+import os
 import pickle
 import time
+from argparse import ArgumentParser
 
-import wandb
 import gym
 import minerl
-import torch as th
 import numpy as np
-import os
+import torch as th
 
-from argparse import ArgumentParser
-from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
+import wandb
 from data_loader import DataLoader
+from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from openai_vpt.lib.tree_util import tree_map
 from utils.logs import Logging
 
@@ -44,10 +44,10 @@ LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
 # WEIGHT_DECAY = 0.039428
 WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 0.0))
 MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
 
-MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
+MAX_BATCHES = int(os.getenv("MAX_BATCHES", 1000))
 
 
 def load_model_parameters(path_to_model_file):
