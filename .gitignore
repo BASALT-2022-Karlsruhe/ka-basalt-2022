@@ -10,8 +10,12 @@ videos
 runs
 models
 wandb
-train
+/train/*
+!/train/BehavioralCloning*.weights
+!/train/PreferenceBasedRL*_PretrainedPolicy.weights
 .viminfo
+basalt
+basalt.pub
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
