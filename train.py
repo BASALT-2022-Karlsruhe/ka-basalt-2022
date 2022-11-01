@@ -13,7 +13,7 @@ from utils.logs import Logging
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
 USE_WANDB = True
-WANDB_LOG_DIR = "train/wandb"
+WANDB_LOG_DIR = "train"
 
 BC_PREFIX = "BehavioralCloning"
 PREFRL_PREFIX = "PreferenceBasedRL"
@@ -51,16 +51,23 @@ EXPERT_DATA_DIR = "data/MineRLBasalt{}-v0"
 AGENT_DATA_DIR = f"data/{FOUNDATION_MODEL}/MineRLBasalt{{}}-v0"
 
 # Control training components
-BC_TRAINING = False
+BC_TRAINING = True
 AGENT_DATA_GENERATION = False
-PREFRL_PRETRAINING = True
+PREFRL_PRETRAINING = False
 PREFRL_TRAINING = False
 
-# Training parameters
-GENERATE_NUM_EPISODES = 50
-ESC_MODELS = []
-NUM_EVAL_VIDEOS = 5
-NUM_MAX_STEPS = [3600, 6000, 6000, 14400]
+INITIAL_POLICY_WEIGHTS_PATH = FOUNDATION_WEIGHTS_PATH
+INITIAL_REWARDNET_WEIGHTS_PATH = ""
+
+# Generation and evaluation parameters
+GENERATE_NUM_EPISODES = 10
+NUM_EVAL_VIDEOS = 0
+NUM_MAX_STEPS = {
+    "FindCave": 3600,
+    "MakeWaterfall": 6000,
+    "CreateVillageAnimalPen": 6000,
+    "BuildVillageHouse": 14400,
+}
 
 
 def pre_training():
@@ -103,8 +110,8 @@ def main():
     """Run the training pipeline."""
     pre_training()
 
-    next_policy_weights_path = FOUNDATION_WEIGHTS_PATH
-    next_rewardnet_weights_path = ""
+    next_policy_weights_path = INITIAL_POLICY_WEIGHTS_PATH
+    next_rewardnet_weights_path = INITIAL_REWARDNET_WEIGHTS_PATH
 
     if BC_TRAINING:
         for env in ENVS:
@@ -138,7 +145,7 @@ def main():
                 next_policy_weights_path.format(env),
                 env,
                 n_episodes=GENERATE_NUM_EPISODES,
-                max_steps=NUM_MAX_STEPS[i],
+                max_steps=NUM_MAX_STEPS[env],
                 video_dir=AGENT_DATA_DIR.format(env),
             )
 
@@ -166,7 +173,7 @@ def main():
                 out_weights_rewardnet=PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH.format(
                     env,
                 ),
-                max_episode_steps=NUM_MAX_STEPS[i],
+                max_episode_steps=NUM_MAX_STEPS[env],
                 reward_net_arch=REWARD_NET_ARCHITECTURE,
                 expert_data=EXPERT_DATA_DIR.format(env),
                 agent_data=AGENT_DATA_DIR.format(env),
@@ -204,7 +211,7 @@ def main():
                 out_weights_policy=PREFRL_POLICY_WEIGHTS_PATH.format(env),
                 in_weights_rewardnet=next_rewardnet_weights_path.format(env),
                 out_weights_rewardnet=PREFRL_REWARDNET_WEIGHTS_PATH.format(env),
-                max_episode_steps=NUM_MAX_STEPS[i],
+                max_episode_steps=NUM_MAX_STEPS[env],
                 reward_net_arch=REWARD_NET_ARCHITECTURE,
             )
             if USE_WANDB:
