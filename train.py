@@ -24,11 +24,14 @@ ENVS = [
     "BuildVillageHouse"
 ]
 
-REWARD_NET_ARCHITECTURE = "ImpalaCNN"
+REWARD_NET_ARCHITECTURE = "CNN"
 
 # Model and weights paths
 FOUNDATION_MODEL = "foundation-model-2x"
-MODEL_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.model"
+FOUNDATION_MODEL_FILE = "{FOUNDATION_MODEL}.model" if int(FOUNDATION_MODEL.split("-")[-1][0]) != 2 else "2x.model" 
+
+MODEL_PATH = f"data/VPT-models/{FOUNDATION_MODEL_FILE}"
+
 FOUNDATION_WEIGHTS_PATH = f"data/VPT-models/{FOUNDATION_MODEL}.weights"
 
 BC_WEIGHTS_PATH = f"train/{BC_PREFIX}{{}}.weights"
