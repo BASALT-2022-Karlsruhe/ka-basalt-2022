@@ -13,6 +13,7 @@ from imitation.rewards.reward_nets import (CnnRewardNet, NormalizedRewardNet,
                                            RewardNet)
 from imitation.rewards.reward_wrapper import MineRLRewardVecEnvWrapper
 from imitation.util import logger as imit_logger
+from imitation.util import networks
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
 from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
@@ -36,6 +37,25 @@ class ImpalaRewardNet(RewardNet):
     def forward(self, state, action, next_state, done):
         rewards = self.net(state).squeeze()
         return rewards
+
+    def predict_th(
+        self,
+        state: np.ndarray,
+        action: np.ndarray,
+        next_state: np.ndarray,
+        done: np.ndarray,
+    ) -> th.Tensor:
+        with networks.evaluating(self):
+            state_th, action_th, next_state_th, done_th = self.preprocess(
+                state,
+                action,
+                next_state,
+                done,
+            )
+            with th.no_grad():
+                rew_th = self(state_th, action_th, next_state_th, done_th).unsqueeze(0)
+            assert rew_th.shape == state.shape[:1]
+        return rew_th
 
 
 def load_model_parameters(path_to_model_file):
@@ -61,20 +81,21 @@ def auto_preference_based_RL_train(
 ):
     """Training workflow for auto-labelled preference-based RL."""
     use_wandb = wandb.run is not None
-    skip_reward_training = True
+    skip_reward_training = False
     # Hyperparameters
 
     seed = 0
 
     # Reward model training
-    n_epochs_reward_model = 5
-    batch_size_reward_model = 32
+    n_epochs_reward_model = 3
+    batch_size_reward_model = 8
     lr_reward_model = 0.001
-    n_comparisons = 1000
-    fragment_length = 60
+    n_comparisons = 1000 # 5k takes ~3h per epoch with ImpalaCNN
+    fragment_length = 40 # max frames per batch ~ 300 to fit on 16GB RAM
+    discount_factor = 0.99
 
     # PPO
-    n_total_steps_ppo = 100000
+    n_total_steps_ppo = 200000
     n_epochs_ppo = 3
     n_steps_ppo = 512
     lr_ppo = 0.0003
@@ -94,13 +115,13 @@ def auto_preference_based_RL_train(
         wandb.config.lr_reward_model = lr_reward_model
         wandb.config.n_comparisons = n_comparisons
         wandb.config.fragment_length = fragment_length
+        wandb.config.discount_factor = discount_factor
 
     # Setup logger
     logger = imit_logger.configure(
-        "train/logs",
+        "train/wandb/log",
         ["stdout", "log", "json", "wandb"]
     )
-    #logger, log_dir = common.setup_logging()
 
     # Setup MineRL environment
     minerl_env_str = "MineRLBasalt" + env_str
@@ -161,7 +182,10 @@ def auto_preference_based_RL_train(
         reward_net.load_state_dict(th.load(in_weights_rewardnet))
     # Move reward model to GPU if possible
     reward_net.to(device)
-    preference_model = preference_comparisons.PreferenceModel(reward_net)
+    preference_model = preference_comparisons.PreferenceModel(
+        reward_net,
+        discount_factor=discount_factor
+    )
 
     if not skip_reward_training:
 
@@ -223,6 +247,7 @@ def auto_preference_based_RL_train(
         },
         env=venv,
         seed=0,
+        gamma=discount_factor,
         n_steps=n_steps_ppo // venv.num_envs,
         batch_size=batch_size_ppo,
         ent_coef=ent_coef_ppo,
