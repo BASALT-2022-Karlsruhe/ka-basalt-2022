@@ -5,14 +5,27 @@ docker-compose.override.yaml
 .gitconfig
 Dockerfile-full
 
+watcher_*
 demo_segmentation/example_segmentations
+videos
+runs
+models
+wandb
+/train/*
+!/train/*.model
+!/train/BehavioralCloning*.weights
+!/train/PreferenceBasedRL*_PretrainedPolicy.weights
+.viminfo
+basalt
+basalt.pub
+data/*
+!/data/VPT-models
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 .idea/*
-data
 # C extensions
 *.so
 

@@ -4,21 +4,21 @@
 #       This will fit inside even smaller GPUs (tested on 8GB one),
 #       but is slow.
 
-import pickle
+import os
 import time
+from argparse import ArgumentParser
 
-import wandb
 import gym
 import minerl
-import torch as th
 import numpy as np
-import os
+import torch as th
 
-from argparse import ArgumentParser
-from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
+import wandb
 from data_loader import DataLoader
+from openai_vpt.agent import MineRLAgent
 from openai_vpt.lib.tree_util import tree_map
 from utils.logs import Logging
+from utils.utils import load_model_parameters
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
@@ -44,18 +44,10 @@ LEARNING_RATE = float(os.getenv("LEARNING_RATE", 0.000181))
 # WEIGHT_DECAY = 0.039428
 WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", 0.0))
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 1.0))
+KL_LOSS_WEIGHT = float(os.getenv("KL_LOSS_WEIGHT", 0.0))
 MAX_GRAD_NORM = float(os.getenv("MAX_GRAD_NORM", 5.0))
 
-MAX_BATCHES = int(os.getenv("MAX_BATCHES", 2700))
-
-
-def load_model_parameters(path_to_model_file):
-    agent_parameters = pickle.load(open(path_to_model_file, "rb"))
-    policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
-    pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
-    pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
-    return policy_kwargs, pi_head_kwargs
+MAX_BATCHES = int(os.getenv("MAX_BATCHES", 1000))
 
 
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):

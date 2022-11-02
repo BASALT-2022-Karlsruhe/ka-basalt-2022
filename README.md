@@ -1,3 +1,13 @@
+# KABasalt Submission
+
+The training pipeline consists of four steps:
+1. Behavioural cloning
+2. Agent data generation
+3. Reward network and RL policy pretraining with automatic preferences
+4. Human-in-the-loop preference-based RL 
+
+Due to time constraints we are just submitting policy weights after step 3.
+
 # Getting started
 
 0. Clone https://github.com/BASALT-2022-Karlsruhe/ka-basalt-2022-datadownloader somewhere *outside* of this project. 

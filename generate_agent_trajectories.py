@@ -28,6 +28,7 @@ def generate_trajectories(
     max_steps=int(1e9),
     show=False,
     video_dir="./video",
+    verbose=1
 ):
     """Generate video and action files for a number of episodes sampled using the give model."""
     # Using aicrowd_gym is important! Your submission will not work otherwise
@@ -54,11 +55,15 @@ def generate_trajectories(
     agent = MineRLAgent(env, policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs)
     agent.load_weights(weights)
 
-    for _ in range(n_episodes):
+    for ep in range(n_episodes):
         file_name = f"{env.file_prefix}.video.{env.file_infix}.video{env.episode_id:06}"
+        if verbose > 0:
+            print(f"Generating trajectory {ep + 1} / {n_episodes}: {file_name}")
+        agent.reset()
         obs = env.reset()
         action_dicts = []
         prev_json_action = None
+        step = 0
         while True:
             # Build agent action
             action = agent.get_action(obs)
@@ -70,6 +75,10 @@ def generate_trajectories(
             prev_json_action = action_dict
 
             obs, _, done, _ = env.step(action)
+
+            if verbose > 0 and step % 100 == 99:
+                print(f"Step {step}")
+            step += 1
 
             if show:
                 env.render()

@@ -1,9 +1,12 @@
 import os
-from typing import Dict
 
+import aicrowd_gym
 import gym
+import numpy as np
 import torch as th
 import torch.nn as nn
+from imitation.rewards.reward_nets import RewardNet
+from imitation.util import networks
 
 from behavioural_cloning import load_model_parameters
 from openai_vpt.agent import MineRLAgent
@@ -73,9 +76,10 @@ class ImpalaLinear(nn.Module):
         return out
 
     def load_cnn_weights(self, model_path="data/VPT-models"):
-        self.cnn.load_state_dict(
-            th.load(os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights"))
-        )
+        weights_path = os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights")
+        if not os.path.is_file(weights_path):
+            save_impala_cnn_weights(self.cnn_width)
+        self.cnn.load_state_dict(th.load(weights_path))
 
 
 class ImpalaBinaryClassifier(nn.Module):
@@ -126,6 +130,37 @@ class ImpalaRegressor(nn.Module):
         return self.out_linear(self.impala_linear(obs))
 
 
+class ImpalaRewardNet(RewardNet):
+    """Reward network based on the ImpalaCNN."""
+
+    def __init__(self, observation_space, action_space, model_width=1):
+        super().__init__(observation_space, action_space)
+        self.net = ImpalaRegressor(cnn_width=model_width)
+
+    def forward(self, state, action, next_state, done):
+        rewards = self.net(state).squeeze()
+        return rewards
+
+    def predict_th(
+        self,
+        state: np.ndarray,
+        action: np.ndarray,
+        next_state: np.ndarray,
+        done: np.ndarray,
+    ) -> th.Tensor:
+        with networks.evaluating(self):
+            state_th, action_th, next_state_th, done_th = self.preprocess(
+                state,
+                action,
+                next_state,
+                done,
+            )
+            with th.no_grad():
+                rew_th = self(state_th, action_th, next_state_th, done_th).unsqueeze(0)
+            assert rew_th.shape == state.shape[:1]
+        return rew_th
+
+
 def save_impala_cnn_weights(model_width=1):
     """
     Saves ImpalaCNN weights.
@@ -134,10 +169,13 @@ def save_impala_cnn_weights(model_width=1):
     """
     # Setup a MineRL environment
     minerl_env_str = "MineRLBasaltFindCave"
-    env = gym.make(minerl_env_str + "-v0")
+    env = aicrowd_gym.make(minerl_env_str + "-v0")
 
     # Setup MineRL agent
-    in_model = f"data/VPT-models/foundation-model-{model_width}x.model"
+    if model_width == 2:
+        in_model = f"data/VPT-models/{model_width}x.model"
+    else:
+        in_model = f"data/VPT-models/foundation-model-{model_width}x.model"
     in_weights = f"data/VPT-models/foundation-model-{model_width}x.weights"
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
@@ -156,7 +194,6 @@ def save_impala_cnn_weights(model_width=1):
 
 def load_impala_cnn_weights(
     model_width=1,
-    weights_path="data/VPT-models/ImpalaCNN-1x.weights",
 ):
     """Load previously saved"""
 
@@ -170,7 +207,12 @@ def load_impala_cnn_weights(
         raise ValueError(f"There is no VPT model with width {model_width}!")
 
     # Load state dict
-    state_dict = th.load(f"data/VPT-models/ImpalaCNN-{model_width}x.weights")
+    try:
+        state_dict = th.load(f"data/VPT-models/ImpalaCNN-{model_width}x.weights")
+    except FileNotFoundError:
+        save_impala_cnn_weights(model_width)
+        state_dict = th.load(f"data/VPT-models/ImpalaCNN-{model_width}x.weights")
+
 
     # Create model object
     impala_cnn = ImpalaCNN(

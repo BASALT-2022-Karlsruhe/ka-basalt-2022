@@ -1,7 +1,5 @@
 """Training script for preference-based reinforcment learning."""
-import pickle
 from argparse import ArgumentParser
-from symbol import comparison
 
 import gym
 import gym.spaces as spaces
@@ -9,38 +7,19 @@ import minerl  # noqa
 import numpy as np
 import torch as th
 from imitation.algorithms import preference_comparisons
-from imitation.rewards.reward_nets import CnnRewardNet, NormalizedRewardNet, RewardNet
+from imitation.rewards.reward_nets import CnnRewardNet, NormalizedRewardNet
 from imitation.util import logger as imit_logger
 from imitation.util.networks import RunningNorm
 from imitation.util.util import make_vec_env
+from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.ppo.ppo import PPO
 
 import sb3_minerl_envs  # noqa
 import wandb
-from impala_based_models import ImpalaRegressor
+from impala_based_models import ImpalaRewardNet
 from openai_vpt.agent import MineRLAgent
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
-
-
-class ImpalaRewardNet(RewardNet):
-    """Reward network based on the ImpalaCNN."""
-
-    def __init__(self, observation_space, action_space, model_width=1):
-        super().__init__(observation_space, action_space)
-        self.net = ImpalaRegressor(cnn_width=model_width)
-
-    def forward(self, state, action, next_state, done):
-        rewards = self.net(state).squeeze()
-        return rewards
-
-
-def load_model_parameters(path_to_model_file):
-    """Load VPT model params."""
-    agent_parameters = pickle.load(open(path_to_model_file, "rb"))
-    policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
-    pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
-    pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
-    return policy_kwargs, pi_head_kwargs
+from utils.utils import load_model_parameters
 
 
 def preference_based_RL_train(
@@ -54,25 +33,32 @@ def preference_based_RL_train(
     reward_net_arch,
 ):
     """Training workflow for preference-based RL."""
+    use_wandb = wandb.run is not None
+
     # Hyperparameters
 
     seed = 0
 
     # Reward model training
-    n_iterations = 5
+    n_iterations = 10
     n_epochs_reward_model = 3
-    n_comparisons = 10
-    comparison_queue_size = None  # None = unbounded queue size
-    initial_comparison_frac = 0.1
-    fragment_length = 1
+    batch_size_reward_model = 8
+    lr_reward_model = 0.001
+    n_comparisons = 1000
+    comparison_queue_size = 10  # None = unbounded queue size
+    initial_comparison_frac = 0.01
+    fragment_length = 40
+    discount_factor = 0.99
 
     # PPO
-    n_total_steps_ppo = 30
-    n_epochs_ppo = 1
-    n_steps_ppo = 10
-    lr_ppo = 0.0003
-    batch_size_ppo = 10
-    ent_coef_ppo = 0.0
+    n_total_steps_ppo = 200000
+    n_epochs_ppo = 3
+    n_steps_ppo = 512
+    lr_ppo = 0.000181
+    batch_size_ppo = 128
+    ent_coef_ppo = 0.01
+    # linear lr annealing (p = 1 - steps/n_total_steps)
+    lr_schedule = lambda p: lr_ppo * p
 
     # Setup W&B config
     if wandb.run is not None:
@@ -85,16 +71,13 @@ def preference_based_RL_train(
         wandb.config.comparison_queue_size = comparison_queue_size
         wandb.config.initial_comparison_frac = initial_comparison_frac
         wandb.config.fragment_length = fragment_length
-
-        wandb.config.n_steps_ppo = n_steps_ppo
-        wandb.config.batch_size_ppo = batch_size_ppo
-        wandb.config.ent_coef_ppo = ent_coef_ppo
-        wandb.config.learning_rate_ppo = lr_ppo
-        wandb.config.n_epochs_ppo = n_epochs_ppo
-        wandb.config.n_total_steps_ppo = n_total_steps_ppo
+        wandb.config.discount_factor = discount_factor
 
     # Setup logger
-    logger = imit_logger.configure()
+    logger = imit_logger.configure(
+        "train/wandb/log",
+        ["stdout", "log", "json", "wandb"]
+    )
 
     # Setup MineRL environment
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -133,6 +116,13 @@ def preference_based_RL_train(
         max_episode_steps=max_episode_steps,
         env_make_kwargs={"minerl_agent": minerl_agent},
     )
+    if use_wandb:
+        venv = VecVideoRecorder(
+            venv,
+            f"train/videos/{wandb.run.id}",
+            record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=400,
+        )
 
     # Define reward model
     image_obs_space = spaces.Box(0, 255, shape=(128, 128, 3), dtype=np.uint8)
@@ -142,12 +132,17 @@ def preference_based_RL_train(
         reward_net = ImpalaRewardNet(image_obs_space, venv.action_space)
     else:
         raise ValueError(f"Reward network architecture unknown: {reward_net_arch}")
+    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
     if in_weights_rewardnet:
         reward_net.load_state_dict(th.load(in_weights_rewardnet))
-    reward_net = NormalizedRewardNet(reward_net, RunningNorm)
-    preference_model = preference_comparisons.PreferenceModel(reward_net)
+    # Move reward model to GPU if possible
+    reward_net.to(device)
+    preference_model = preference_comparisons.PreferenceModel(
+        reward_net,
+        discount_factor=discount_factor
+    )
 
-    fragmenter = preference_comparisons.MineRLFragmenter(
+    fragmenter = preference_comparisons.RandomFragmenter(
         warning_threshold=0,
         seed=seed,
         custom_logger=logger,
@@ -163,6 +158,8 @@ def preference_based_RL_train(
         model=reward_net,
         loss=preference_comparisons.CrossEntropyRewardLoss(preference_model),
         epochs=n_epochs_reward_model,
+        batch_size=batch_size_reward_model,
+        lr=lr_reward_model,
         custom_logger=logger,
     )
 
@@ -171,14 +168,20 @@ def preference_based_RL_train(
         policy_kwargs={
             "minerl_agent": minerl_agent,
             "optimizer_class": th.optim.Adam,
+            # see https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/
+            "optimizer_kwargs": {"eps": 1e-5}
         },
         env=venv,
         seed=seed,
+        gamma=discount_factor,
         n_steps=n_steps_ppo // venv.num_envs,
         batch_size=batch_size_ppo,
         ent_coef=ent_coef_ppo,
-        learning_rate=lr_ppo,
+        learning_rate=lr_schedule,
         n_epochs=n_epochs_ppo,
+        device=device,
+        verbose=1,
+        tensorboard_log=f"train/runs/{wandb.run.id}" if use_wandb else None,
     )
 
     trajectory_generator = preference_comparisons.MineRLAgentTrainer(

@@ -8,6 +8,8 @@ dependencies:
   - pip
   - wandb
   - py-opencv
+  - cudatoolkit=10.2
+  - pytorch=1.9.0
   - pip:
     - git+https://github.com/minerllabs/minerl
     - matplotlib
@@ -17,10 +19,8 @@ dependencies:
     - aicrowd-gym
     - gym3
     - attrs
-    - --extra-index-url https://download.pytorch.org/whl/cu113
-    - torch==1.12.1+cu113
     - werkzeug==2.1
-    - git+https://${GIT_ACCESS_TOKEN}@github.com/BASALT-2022-Karlsruhe/imitation.git@human-preferences
+    - git+https://github.com/rk1a/imitation.git@human-preferences
     - opencv-python-headless
     - django
     - djangorestframework
