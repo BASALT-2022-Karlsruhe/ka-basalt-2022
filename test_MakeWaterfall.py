@@ -7,7 +7,7 @@ import minerl
 
 from config import EVAL_EPISODES, EVAL_MAX_STEPS
 from openai_vpt.agent import MineRLAgent
-from train import FOUNDATION_MODEL, SUBMISSION_WEIGHTS_PATH
+from train import FOUNDATION_MODEL_FILE, SUBMISSION_WEIGHTS_PATH
 
 coloredlogs.install(logging.DEBUG)
 
@@ -22,7 +22,7 @@ def main():
 
     # Load your model here
     # NOTE: The trained parameters must be inside "train" directory!
-    model = f"data/VPT-models/{FOUNDATION_MODEL}.model"
+    model = f"data/VPT-models/{FOUNDATION_MODEL_FILE}"
     weights = SUBMISSION_WEIGHTS_PATH.format(ENV_STRING)
     agent_parameters = pickle.load(open(model, "rb"))
     policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
