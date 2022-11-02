@@ -24,7 +24,7 @@ ENVS = [
     "BuildVillageHouse"
 ]
 
-REWARD_NET_ARCHITECTURE = "CNN"
+REWARD_NET_ARCHITECTURE = "ImpalaCNN"
 
 # Model and weights paths
 FOUNDATION_MODEL = "foundation-model-2x"
@@ -183,8 +183,8 @@ def main():
             )
             if USE_WANDB:
                 run.finish()
-            next_policy_weights_path = PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH
-            next_rewardnet_weights_path = PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH
+        next_policy_weights_path = PREFRL_PRETRAINED_POLICY_WEIGHTS_PATH
+        next_rewardnet_weights_path = PREFRL_PRETRAINED_REWARDNET_WEIGHTS_PATH
 
     if PREFRL_TRAINING:
 
