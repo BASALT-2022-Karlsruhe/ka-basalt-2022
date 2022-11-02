@@ -12,6 +12,7 @@ runs
 models
 wandb
 /train/*
+!/train/*.model
 !/train/BehavioralCloning*.weights
 !/train/PreferenceBasedRL*_PretrainedPolicy.weights
 .viminfo
