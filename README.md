@@ -3,7 +3,7 @@
 The training pipeline consists of four steps:
 1. Behavioural cloning
 2. Agent data generation
-3. ImpalaCNN-based reward network and RL policy pretraining with automatic preferences
+3. Reward network and RL policy pretraining with automatic preferences
 4. Human-in-the-loop preference-based RL 
 
 Due to time constraints we are just submitting policy weights after step 3.
