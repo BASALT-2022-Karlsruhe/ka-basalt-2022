@@ -45,15 +45,15 @@ def auto_preference_based_RL_train(
     seed = 0
 
     # Reward model training
-    n_epochs_reward_model = 3
+    n_epochs_reward_model = 5
     batch_size_reward_model = 4
     lr_reward_model = 0.001
-    n_comparisons = 300  # 5k takes ~3h per epoch with ImpalaCNN
+    n_comparisons = 1000  # 5k takes ~3h per epoch with ImpalaCNN
     fragment_length = 40  # max frames per batch ~ 300 to fit on 16GB RAM
     discount_factor = 0.99
 
     # PPO
-    n_total_steps_ppo = 15000
+    n_total_steps_ppo = 20000
     n_epochs_ppo = 3
     n_steps_ppo = 512
     lr_ppo = 0.000181
