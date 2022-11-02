@@ -55,7 +55,13 @@ def post_training():
         except:
             print("No ESC model available.")
         create_videos(
-            model, esc_model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
+            model,
+            esc_model,
+            env,
+            FOUNDATION_MODEL,
+            NUM_VIDEOS,
+            NUM_MAX_STEPS[i],
+            show=False,
         )
     Logging.info("End training")
 
@@ -93,7 +99,7 @@ def main():
             )
             Logging.info(f"===PrefRL Training {env} model===")
             preference_based_RL_train(
-                env_str=env,
+                env_string=env,
                 in_model=f"data/VPT-models/{FOUNDATION_MODEL}.model",
                 in_weights=f"train/BehavioralCloning{env}.weights"
                 if BC_TRAINING

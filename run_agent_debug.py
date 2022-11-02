@@ -8,4 +8,12 @@ if __name__ == "__main__":
     record = False
     max_steps = 1000
     video_dir = "./video"
-    main(model=model, weights=weights, env=env, show=show, record=record, max_steps=max_steps, video_dir=video_dir)
+    main(
+        model=model,
+        weights=weights,
+        env=env,
+        show=show,
+        record=record,
+        max_steps=max_steps,
+        video_dir=video_dir,
+    )

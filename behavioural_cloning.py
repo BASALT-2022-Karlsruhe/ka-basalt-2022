@@ -76,11 +76,21 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     # To create model with the right environment.
     # All basalt environments have the same settings, so any of them works here
     env = gym.make("MineRLBasaltFindCave-v0")
-    agent = MineRLAgent(env, device=DEVICE, policy_kwargs=agent_policy_kwargs, pi_head_kwargs=agent_pi_head_kwargs)
+    agent = MineRLAgent(
+        env,
+        device=DEVICE,
+        policy_kwargs=agent_policy_kwargs,
+        pi_head_kwargs=agent_pi_head_kwargs,
+    )
     agent.load_weights(in_weights)
 
     # Create a copy which will have the original parameters
-    original_agent = MineRLAgent(env, device=DEVICE, policy_kwargs=agent_policy_kwargs, pi_head_kwargs=agent_pi_head_kwargs)
+    original_agent = MineRLAgent(
+        env,
+        device=DEVICE,
+        policy_kwargs=agent_policy_kwargs,
+        pi_head_kwargs=agent_pi_head_kwargs,
+    )
     original_agent.load_weights(in_weights)
     env.close()
 
@@ -101,9 +111,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     # Parameters taken from the OpenAI VPT paper
     optimizer = th.optim.Adam(
-        trainable_parameters,
-        lr=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY
+        trainable_parameters, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
     )
 
     data_loader = DataLoader(
@@ -123,9 +131,13 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     dummy_first = th.from_numpy(np.array((False,))).to(DEVICE)
 
     loss_sum = 0
-    for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(data_loader):
+    for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(
+        data_loader
+    ):
         batch_loss = 0
-        for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
+        for image, action, episode_id in zip(
+            batch_images, batch_actions, batch_episode_id
+        ):
             if image is None and action is None:
                 # A work-item was done. Remove hidden state
                 if episode_id in episode_hidden_states:
@@ -133,7 +145,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                     del removed_hidden_state
                 continue
 
-            agent_action = agent._env_action_to_agent(action, to_torch=True, check_if_null=True)
+            agent_action = agent._env_action_to_agent(
+                action, to_torch=True, check_if_null=True
+            )
             if agent_action is None:
                 # Action was null
                 continue
@@ -144,20 +158,22 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             agent_state = episode_hidden_states[episode_id]
 
             pi_distribution, _, new_agent_state = policy.get_output_for_observation(
-                agent_obs,
-                agent_state,
-                dummy_first
+                agent_obs, agent_state, dummy_first
             )
 
             with th.no_grad():
-                original_pi_distribution, _, _ = original_policy.get_output_for_observation(
-                    agent_obs,
-                    agent_state,
-                    dummy_first
+                (
+                    original_pi_distribution,
+                    _,
+                    _,
+                ) = original_policy.get_output_for_observation(
+                    agent_obs, agent_state, dummy_first
                 )
 
-            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
-            kl_div = policy.get_kl_of_action_dists(pi_distribution, original_pi_distribution)
+            log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
+            kl_div = policy.get_kl_of_action_dists(
+                pi_distribution, original_pi_distribution
+            )
 
             # Make sure we do not try to backprop through sequence
             # (fails with current accumulation)
@@ -176,12 +192,14 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         optimizer.zero_grad()
 
         loss_sum += batch_loss
-        
-        wandb.log({'loss': batch_loss})
+
+        wandb.log({"loss": batch_loss})
 
         if batch_i % LOSS_REPORT_RATE == 0:
             time_since_start = time.time() - start_time
-            Logging.info(f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}")
+            Logging.info(
+                f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}"
+            )
             loss_sum = 0
 
         if batch_i > MAX_BATCHES:
@@ -195,12 +213,35 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     state_dict = policy.state_dict()
     th.save(state_dict, out_weights)
 
+
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--data-dir", type=str, required=True, help="Path to the directory containing recordings to be trained on")
-    parser.add_argument("--in-model", required=True, type=str, help="Path to the .model file to be finetuned")
-    parser.add_argument("--in-weights", required=True, type=str, help="Path to the .weights file to be finetuned")
-    parser.add_argument("--out-weights", required=True, type=str, help="Path where finetuned weights will be saved")
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        required=True,
+        help="Path to the directory containing recordings to be trained on",
+    )
+    parser.add_argument(
+        "--in-model",
+        required=True,
+        type=str,
+        help="Path to the .model file to be finetuned",
+    )
+    parser.add_argument(
+        "--in-weights",
+        required=True,
+        type=str,
+        help="Path to the .weights file to be finetuned",
+    )
+    parser.add_argument(
+        "--out-weights",
+        required=True,
+        type=str,
+        help="Path where finetuned weights will be saved",
+    )
 
     args = parser.parse_args()
-    behavioural_cloning_train(args.data_dir, args.in_model, args.in_weights, args.out_weights)
+    behavioural_cloning_train(
+        args.data_dir, args.in_model, args.in_weights, args.out_weights
+    )

@@ -12,7 +12,9 @@ from utils import create_subfolders
 from utils.logs import Logging
 from openai_vpt.agent import resize_image, AGENT_RESOLUTION
 
-LOG_FILE = f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
+LOG_FILE = (
+    f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
+)
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
 STACK_SIZE = 4
 
@@ -34,7 +36,9 @@ class FindCaveCNN(nn.Module):
 
         # Compute shape by doing one forward pass
         with th.no_grad():
-            test_tensor = th.as_tensor(np.zeros((STACK_SIZE, *AGENT_RESOLUTION))[None]).float()
+            test_tensor = th.as_tensor(
+                np.zeros((STACK_SIZE, *AGENT_RESOLUTION))[None]
+            ).float()
             n_flatten = self.cnn(test_tensor).shape[1]
 
         self.linear = nn.Linear(n_flatten, features_dim)
@@ -43,7 +47,7 @@ class FindCaveCNN(nn.Module):
         return self.linear(self.cnn(observations))
 
     def predict(self, observations):
-        return self.forward(observation) > 0.
+        return self.forward(observation) > 0.0
 
 
 def preprocessing(img):
@@ -53,7 +57,7 @@ def preprocessing(img):
         print(str(e))
     greyscale_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
     # scale pixel values to [-1, 1]
-    normed_greyscale_resized_img = 2 * (greyscale_img / 255.) - 1
+    normed_greyscale_resized_img = 2 * (greyscale_img / 255.0) - 1
     return normed_greyscale_resized_img
 
 
@@ -65,7 +69,7 @@ def process_video(video_path):
     success = True
     while success:
         success, img = video_object.read()
-        if  success and img is not None:
+        if success and img is not None:
             processed_img = preprocessing(img)
             current_stack[count % 4, :, :] = processed_img
             count += 1
@@ -114,7 +118,7 @@ class FindCaveImageDataset(Dataset):
                 if os.path.exists(filepath):
                     self.stack_files.append(filename)
                     self.stack_labels.append(label)
-                    break # each stack can only have one label
+                    break  # each stack can only have one label
 
         assert len(self.stack_files) == len(self.stack_labels) == self.num_stacks
 
@@ -129,16 +133,19 @@ class FindCaveImageDataset(Dataset):
             self.num_stacks -= abs(difference_01)
 
             # Randomly choose items to delete from registry lists
-            if difference_01 > 0: # more 0 labels
+            if difference_01 > 0:  # more 0 labels
                 label_0_idxs = np.where(np.array(self.stack_labels) == 0)[0]
-                delete_idxs = np.random.choice(label_0_idxs, abs(difference_01), replace=False)               
-            elif difference_01 < 0: # more 1 labels
+                delete_idxs = np.random.choice(
+                    label_0_idxs, abs(difference_01), replace=False
+                )
+            elif difference_01 < 0:  # more 1 labels
                 label_1_idxs = np.where(np.array(self.stack_labels) == 1)[0]
-                delete_idxs = np.random.choice(label_1_idxs, abs(difference_01), replace=False)               
+                delete_idxs = np.random.choice(
+                    label_1_idxs, abs(difference_01), replace=False
+                )
 
             for del_idx in sorted(delete_idxs, reverse=True):
                 del self.stack_labels[del_idx], self.stack_files[del_idx]
-                    
 
     def __len__(self):
         return self.num_stacks
@@ -179,7 +186,9 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
     # actual numbers after creating dataset (could be different due to balancing)
     num_validation_stacks = int(dataset.num_stacks * validation_frac)
     num_training_stacks = dataset.num_stacks - num_validation_stacks
-    Logging.info(f"#stacks: {dataset.num_stacks} = #training stacks: {num_training_stacks} + #validation stacks: {num_validation_stacks}")
+    Logging.info(
+        f"#stacks: {dataset.num_stacks} = #training stacks: {num_training_stacks} + #validation stacks: {num_validation_stacks}"
+    )
 
     # split into train and validation sets
     training_dataset, validation_dataset = random_split(
@@ -188,16 +197,20 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
         generator=th.Generator().manual_seed(42),
     )
 
-    training_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
-    validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
+    training_loader = DataLoader(
+        training_dataset, batch_size=batch_size, shuffle=True, num_workers=6
+    )
+    validation_loader = DataLoader(
+        validation_dataset, batch_size=batch_size, shuffle=False, num_workers=6
+    )
 
     # create model, optimizer, loss function
     model = FindCaveCNN().to(DEVICE)
     optimizer = th.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.BCEWithLogitsLoss()
 
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    best_vloss = 1_000_000.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    best_vloss = 1_000_000.0
 
     for epoch in range(num_epochs):
 
@@ -217,7 +230,7 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
             # Backprop
             loss.backward()
             optimizer.step()
-            
+
             with th.no_grad():
                 # Calculate accuracy
                 pred = (logit_pred.sigmoid() > 0).long()
@@ -230,7 +243,11 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
             if i % 1000 == 999:
                 last_loss = running_loss / 1000
                 last_accuracy = 100 * correct / (1000 * batch_size)
-                tqdm.write("Batch: {}, Loss: {:.4f}, Accuracy: {:.2f}".format(i + 1, last_loss, last_accuracy))
+                tqdm.write(
+                    "Batch: {}, Loss: {:.4f}, Accuracy: {:.2f}".format(
+                        i + 1, last_loss, last_accuracy
+                    )
+                )
                 running_loss = 0
                 correct = 0
         model.train(False)
@@ -257,11 +274,15 @@ def train(stack_dir, model_dir, data_frac=0.05, validation_frac=0.5):
             avg_vloss = running_vloss / (i + 1)
             avg_accuracy = 100 * vcorrect / len(validation_dataset)
 
-        Logging.info('Loss: train {:.4f} / valid {:.4f}, Accuracy: train {:.2f} / valid {:.2f}'.format(last_loss, avg_vloss, last_accuracy, avg_accuracy))
+        Logging.info(
+            "Loss: train {:.4f} / valid {:.4f}, Accuracy: train {:.2f} / valid {:.2f}".format(
+                last_loss, avg_vloss, last_accuracy, avg_accuracy
+            )
+        )
 
         # if avg_vloss < best_vloss: # this only makes sense for many epochs
         best_vloss = avg_vloss
-        model_file = 'FindCaveCNN_{}_epoch{}.weights'.format(timestamp, epoch + 1)
+        model_file = "FindCaveCNN_{}_epoch{}.weights".format(timestamp, epoch + 1)
         model_path = os.path.join(model_dir, model_file)
         Logging.info(f"Saving model to {model_file}")
         th.save(model.state_dict(), model_path)
@@ -284,8 +305,8 @@ if __name__ == "__main__":
     train(
         stack_dir="/home/aicrowd/data/segments/FindCave/stacks",
         model_dir="/home/aicrowd/train",
-        data_frac=0.01, # fraction of data to be used
-        validation_frac=0.2, # fraction of loaded data to be used for validation
+        data_frac=0.01,  # fraction of data to be used
+        validation_frac=0.2,  # fraction of loaded data to be used for validation
     )
 
     Logging.info("Finished training")

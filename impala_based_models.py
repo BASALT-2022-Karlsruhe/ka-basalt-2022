@@ -30,11 +30,11 @@ class ImpalaLinear(nn.Module):
         super().__init__()
 
         if cnn_width == 1:
-            chans=(64, 128, 128)
+            chans = (64, 128, 128)
         elif cnn_width == 2:
-            chans=(128, 256, 256)
+            chans = (128, 256, 256)
         elif cnn_width == 3:
-            chans=(192, 384, 384)
+            chans = (192, 384, 384)
         else:
             raise ValueError(f"There is no VPT model with width {model_width}!")
         self.cnn_width = cnn_width
@@ -71,13 +71,21 @@ class ImpalaLinear(nn.Module):
         return out
 
     def load_cnn_weights(self, model_path="data/VPT-models"):
-        self.cnn.load_state_dict(th.load(os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights")))
+        self.cnn.load_state_dict(
+            th.load(os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights"))
+        )
 
 
 class ImpalaBinaryClassifier(nn.Module):
     """Classification network based on ImpalaCNN"""
 
-    def __init__(self, cnn_outsize=256, cnn_width=1, model_path="data/VPT-models", hidden_size=256):
+    def __init__(
+        self,
+        cnn_outsize=256,
+        cnn_width=1,
+        model_path="data/VPT-models",
+        hidden_size=256,
+    ):
         super().__init__()
         self.impala_linear = ImpalaLinear(hidden_size, cnn_outsize, cnn_width)
         self.out_linear = nn.Linear(hidden_size, 2)
@@ -104,7 +112,7 @@ class ImpalaRewardModel(nn.Module):
         self.impala_linear = ImpalaLinear(cnn_outsize, 1, cnn_width)
         self.impala_linear.load_cnn_weights(model_path)
         # TODO normalizing layer
-        #self.normalized_reward_layer = nn.Linear(hidden_size, 1)
+        # self.normalized_reward_layer = nn.Linear(hidden_size, 1)
 
     def forward(self, obs):
         return self.impala_linear(obs)
@@ -145,11 +153,11 @@ def load_impala_cnn_weights(
     """Load previously saved"""
 
     if model_width == 1:
-        chans=(64, 128, 128)
+        chans = (64, 128, 128)
     elif model_width == 2:
-        chans=(128, 256, 256)
+        chans = (128, 256, 256)
     elif model_width == 3:
-        chans=(192, 384, 384)
+        chans = (192, 384, 384)
     else:
         raise ValueError(f"There is no VPT model with width {model_width}!")
 

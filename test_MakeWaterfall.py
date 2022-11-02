@@ -9,13 +9,15 @@ def main():
     run_agent_main(
         model="data/VPT-models/foundation-model-1x.model",
         weights="train/MineRLBasaltMakeWaterfall.weights",
-        env="MineRLBasaltMakeWaterfall-v0",
+        env_string="MineRLBasaltMakeWaterfall-v0",
         n_episodes=EVAL_EPISODES,
         max_steps=EVAL_MAX_STEPS,
-        video_dir = str(video_dir.absolute()),
+        video_dir=str(video_dir.absolute()),
         show=False,
-        record=False
+        record=False,
+        esc_model_path=None,
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

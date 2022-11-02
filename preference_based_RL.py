@@ -28,10 +28,10 @@ def load_model_parameters(path_to_model_file):
     return policy_kwargs, pi_head_kwargs
 
 
-def preference_based_RL_train(env_str, in_model, in_weights, out_weights):
+def preference_based_RL_train(env_string, in_model, in_weights, out_weights):
 
     # Setup MineRL environment
-    minerl_env_str = "MineRLBasalt" + env_str
+    minerl_env_str = "MineRLBasalt" + env_string
     env = gym.make(minerl_env_str + "-v0")
 
     # Setup MineRL agent

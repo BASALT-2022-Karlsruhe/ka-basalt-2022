@@ -62,7 +62,9 @@ class FanInInitReLULayer(nn.Module):
             self.norm = nn.LayerNorm(inchan)
 
         layer = dict(conv=nn.Conv2d, conv3d=nn.Conv3d, linear=nn.Linear)[layer_type]
-        self.layer = layer(inchan, outchan, bias=self.norm is None, *layer_args, **layer_kwargs)
+        self.layer = layer(
+            inchan, outchan, bias=self.norm is None, *layer_args, **layer_kwargs
+        )
 
         # Init Weights (Fan-In)
         self.layer.weight.data *= init_scale / self.layer.weight.norm(
@@ -98,7 +100,7 @@ class ResidualRecurrentBlocks(nn.Module):
         **block_kwargs,
     ):
         super().__init__()
-        init_scale = n_block ** -0.5 if is_residual else 1
+        init_scale = n_block**-0.5 if is_residual else 1
         self.blocks = nn.ModuleList(
             [
                 ResidualRecurrentBlock(
@@ -152,7 +154,7 @@ class ResidualRecurrentBlock(nn.Module):
         s = init_scale
         if use_pointwise_layer:
             if is_residual:
-                s *= 2 ** -0.5  # second residual
+                s *= 2**-0.5  # second residual
             self.mlp0 = FanInInitReLULayer(
                 hidsize,
                 hidsize * pointwise_ratio,
@@ -173,8 +175,12 @@ class ResidualRecurrentBlock(nn.Module):
         self.pre_r_ln = nn.LayerNorm(hidsize)
         if recurrence_type in ["multi_layer_lstm", "multi_layer_bilstm"]:
             self.r = nn.LSTM(hidsize, hidsize, batch_first=True)
-            nn.init.normal_(self.r.weight_hh_l0, std=s * (self.r.weight_hh_l0.shape[0] ** -0.5))
-            nn.init.normal_(self.r.weight_ih_l0, std=s * (self.r.weight_ih_l0.shape[0] ** -0.5))
+            nn.init.normal_(
+                self.r.weight_hh_l0, std=s * (self.r.weight_hh_l0.shape[0] ** -0.5)
+            )
+            nn.init.normal_(
+                self.r.weight_ih_l0, std=s * (self.r.weight_ih_l0.shape[0] ** -0.5)
+            )
             self.r.bias_hh_l0.data *= 0
             self.r.bias_ih_l0.data *= 0
         elif recurrence_type == "transformer":
@@ -198,9 +204,12 @@ class ResidualRecurrentBlock(nn.Module):
             x,
             first,
             state,
-            reverse_lstm=self.recurrence_type == "multi_layer_bilstm" and (self.block_number + 1) % 2 == 0,
+            reverse_lstm=self.recurrence_type == "multi_layer_bilstm"
+            and (self.block_number + 1) % 2 == 0,
         )
-        if self.is_residual and "lstm" in self.recurrence_type:  # Transformer already residual.
+        if (
+            self.is_residual and "lstm" in self.recurrence_type
+        ):  # Transformer already residual.
             x = x + residual
         if self.use_pointwise_layer:
             # Residual MLP

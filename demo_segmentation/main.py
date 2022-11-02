@@ -53,7 +53,9 @@ def saveFiles(path, output_dir, filename, fps, frames, keyframes):
 def SplitWaterfallDemo(path, output_dir, out_name):
 
     # Don't process video twice -> need to delete output if want to regenerate
-    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(
+        f"{output_dir}/stage_1/{out_name}"
+    ):
         return
 
     # Path to video file
@@ -113,7 +115,9 @@ def SplitWaterfallDemo(path, output_dir, out_name):
 def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
 
     # Don't process video twice -> need to delete output if want to regenerate
-    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+    if os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(
+        f"{output_dir}/stage_1/{out_name}"
+    ):
         return
 
     last_n_seconds = 2
@@ -153,9 +157,31 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
             break
 
         # detect and skip crafting menu
-        if np.sum(np.abs(image[110:155,310:327, :].reshape((765,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[160:178,370:400,:].reshape((540,3)).mean(0) - np.array([197, 197, 197]))) < 5 or np.sum(np.abs(image[102:120,380:398,:].reshape((324,3)).mean(0) - np.array([197, 197, 197]))) < 5:
-           craft = True
-           continue
+        if (
+            np.sum(
+                np.abs(
+                    image[110:155, 310:327, :].reshape((765, 3)).mean(0)
+                    - np.array([197, 197, 197])
+                )
+            )
+            < 5
+            or np.sum(
+                np.abs(
+                    image[160:178, 370:400, :].reshape((540, 3)).mean(0)
+                    - np.array([197, 197, 197])
+                )
+            )
+            < 5
+            or np.sum(
+                np.abs(
+                    image[102:120, 380:398, :].reshape((324, 3)).mean(0)
+                    - np.array([197, 197, 197])
+                )
+            )
+            < 5
+        ):
+            craft = True
+            continue
 
         if actions[min(linecount, len(actions) - 1)]["isGuiOpen"]:
             craft = True
@@ -192,12 +218,12 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
     if len(frames) == 0 and fps == 0:
         print(f"Empty video: {out_name}")
 
-    #seconds_from_start = keyframe / fps
-    #seconds_from_end = len(frames) / fps - seconds_from_start
-    #frames_from_end = len(frames) - keyframe
-    #print(
+    # seconds_from_start = keyframe / fps
+    # seconds_from_end = len(frames) / fps - seconds_from_start
+    # frames_from_end = len(frames) - keyframe
+    # print(
     #    f"Splitting {path} at frame {keyframe} = {frames_from_end} frames from end = {seconds_from_start:.2f} s from start = {seconds_from_end:.2f} s from end"
-    #)
+    # )
 
     if plot:
         plt.figure()
@@ -221,7 +247,11 @@ def SplitFindCaveDemo(path, output_dir, out_name, darkness=True, plot=False):
 def SplitCreateVillageAnimalPenDemo(path, output_dir, out_name):
 
     # Don't process video twice -> need to delete output if want to regenerate
-    if os.path.exists(f"{output_dir}/stage_3/{out_name}") and os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+    if (
+        os.path.exists(f"{output_dir}/stage_3/{out_name}")
+        and os.path.exists(f"{output_dir}/stage_2/{out_name}")
+        and os.path.exists(f"{output_dir}/stage_1/{out_name}")
+    ):
         return
 
     SplitInventoryChangeDemo(
@@ -233,9 +263,12 @@ def SplitCreateVillageAnimalPenDemo(path, output_dir, out_name):
 def SplitBuildVillageHouseDemo(path, output_dir, out_name):
 
     # Don't process video twice -> need to delete output if want to regenerate
-    if os.path.exists(f"{output_dir}/stage_3/{out_name}") and os.path.exists(f"{output_dir}/stage_2/{out_name}") and os.path.exists(f"{output_dir}/stage_1/{out_name}"):
+    if (
+        os.path.exists(f"{output_dir}/stage_3/{out_name}")
+        and os.path.exists(f"{output_dir}/stage_2/{out_name}")
+        and os.path.exists(f"{output_dir}/stage_1/{out_name}")
+    ):
         return
-
 
     SplitInventoryChangeDemo(
         path, output_dir, out_name, slots=[2, 3, 4, 5, 6, 7, 8], max_len=14400

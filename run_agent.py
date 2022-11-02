@@ -15,15 +15,27 @@ from find_cave_classifier import preprocessing
 ESC_MODELS = {"MineRLBasaltFindCave-v0": ImpalaBinaryClassifier}
 
 
-def main(model, weights, esc_model_path, env_string, n_episodes=3, max_steps=int(1e9), show=False, record=False, video_dir="./video"):
+def main(
+    model,
+    weights,
+    esc_model_path,
+    env_string,
+    n_episodes=3,
+    max_steps=int(1e9),
+    show=False,
+    record=False,
+    video_dir="./video",
+):
     # Using aicrowd_gym is important! Your submission will not work otherwise
     env = aicrowd_gym.make(env_string)
 
     env._max_episode_steps = max_steps
     if record:
         # enable recording
-        env.metadata['render.modes'] = ["rgb_array", "ansi"]
-        env = Monitor(env, video_dir, video_callable=lambda episode_id: True, force=True)
+        env.metadata["render.modes"] = ["rgb_array", "ansi"]
+        env = Monitor(
+            env, video_dir, video_callable=lambda episode_id: True, force=True
+        )
 
     agent_parameters = pickle.load(open(model, "rb"))
     policy_kwargs = agent_parameters["model"]["args"]["net"]["args"]
@@ -78,15 +90,41 @@ def main(model, weights, esc_model_path, env_string, n_episodes=3, max_steps=int
 if __name__ == "__main__":
     parser = ArgumentParser("Run pretrained models on MineRL environment")
 
-    parser.add_argument("--weights", type=str, required=True, help="Path to the '.weights' file to be loaded.")
-    parser.add_argument("--model", type=str, required=True, help="Path to the '.model' file to be loaded.")
-    parser.add_argument("--esc-model-path", type=str, required=True, help="Path to the '.model' file to be loaded.")
+    parser.add_argument(
+        "--weights",
+        type=str,
+        required=True,
+        help="Path to the '.weights' file to be loaded.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        help="Path to the '.model' file to be loaded.",
+    )
+    parser.add_argument(
+        "--esc-model-path",
+        type=str,
+        required=True,
+        help="Path to the '.model' file to be loaded.",
+    )
     parser.add_argument("--env-string", type=str, required=True)
     parser.add_argument("--max_steps", type=int, required=False, default=1000)
     parser.add_argument("--show", action="store_true", help="Render the environment.")
-    parser.add_argument("--record", action="store_true", help="Record the rendered environment.")
+    parser.add_argument(
+        "--record", action="store_true", help="Record the rendered environment."
+    )
     parser.add_argument("--video_dir", type=str, required=False, default="./video")
 
     args = parser.parse_args()
 
-    main(args.model, args.weights, args.env, show=args.show, record=args.record, max_steps=args.max_steps, video_dir=args.video_dir)
+    main(
+        args.model,
+        args.weights,
+        env_string=args.env,
+        show=args.show,
+        record=args.record,
+        max_steps=args.max_steps,
+        video_dir=args.video_dir,
+        esc_model_path=None,
+    )

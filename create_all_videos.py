@@ -30,5 +30,11 @@ for i, env in enumerate(ENVS):
     Logging.info(f"Using policy from at {model}")
 
     create_videos(
-        model, esc_model, env, FOUNDATION_MODEL, NUM_VIDEOS, NUM_MAX_STEPS[i], show=False
+        model,
+        esc_model,
+        env,
+        FOUNDATION_MODEL,
+        NUM_VIDEOS,
+        NUM_MAX_STEPS[i],
+        show=False,
     )
