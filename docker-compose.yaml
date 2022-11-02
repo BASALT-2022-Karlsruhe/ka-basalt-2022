@@ -5,7 +5,7 @@ services:
 
     # for interactive mode e.g. for entrypoint /bin/bash
     stdin_open: true # docker run -i
-    tty: true        # docker run -t
+    tty: true # docker run -t
 
     entrypoint: "xvfb-run python train.py"
 
@@ -19,7 +19,7 @@ services:
         git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
-      - 8000:8000
+      - ${PREF_PORT}:8000
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_${DATA_ROOT}
@@ -32,8 +32,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0'] # specify the device ids of your system's GPUs in docker-compose.override.yaml. The specified GPUs will be used for training.
-              capabilities: [ gpu ]  
+              device_ids: [ '0' ]
+              capabilities: [ gpu ]
 volumes:
   ka-basalt-2022-datadownloader_data:
     external: true
