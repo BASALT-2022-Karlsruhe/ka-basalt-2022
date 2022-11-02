@@ -12,7 +12,7 @@ from utils.create_videos import create_videos
 from utils.logs import Logging
 
 LOG_FILE = f"log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
-USE_WANDB = True
+USE_WANDB = False
 WANDB_LOG_DIR = "train"
 
 BC_PREFIX = "BehavioralCloning"
