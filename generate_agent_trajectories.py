@@ -59,6 +59,7 @@ def generate_trajectories(
         file_name = f"{env.file_prefix}.video.{env.file_infix}.video{env.episode_id:06}"
         if verbose > 0:
             print(f"Generating trajectory {ep + 1} / {n_episodes}: {file_name}")
+        agent.reset()
         obs = env.reset()
         action_dicts = []
         prev_json_action = None

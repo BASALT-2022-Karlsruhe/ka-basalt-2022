@@ -46,18 +46,18 @@ def auto_preference_based_RL_train(
 
     # Reward model training
     n_epochs_reward_model = 3
-    batch_size_reward_model = 8
+    batch_size_reward_model = 4
     lr_reward_model = 0.001
-    n_comparisons = 1000  # 5k takes ~3h per epoch with ImpalaCNN
+    n_comparisons = 300  # 5k takes ~3h per epoch with ImpalaCNN
     fragment_length = 40  # max frames per batch ~ 300 to fit on 16GB RAM
     discount_factor = 0.99
 
     # PPO
-    n_total_steps_ppo = 200000
+    n_total_steps_ppo = 15000
     n_epochs_ppo = 3
     n_steps_ppo = 512
     lr_ppo = 0.000181
-    batch_size_ppo = 128
+    batch_size_ppo = 64
     ent_coef_ppo = 0.01
     # linear lr annealing (p = 1 - steps/n_total_steps)
     lr_schedule = lambda p: lr_ppo * p
@@ -165,6 +165,7 @@ def auto_preference_based_RL_train(
             expert_generator,
             agent_generator,
             fragment_length,
+            later_fragments_preferred=True,
         )
 
         # Add comparisons to the dataset
