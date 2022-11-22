@@ -1,3 +1,6 @@
 [submodule "pref-collect"]
 	path = pref-collect
 	url = https://github.com/BASALT-2022-Karlsruhe/pref-collect.git
+[submodule "imitation"]
+	path = imitation
+	url = https://github.com/BASALT-2022-Karlsruhe/imitation
