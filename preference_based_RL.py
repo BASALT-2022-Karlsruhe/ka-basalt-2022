@@ -6,6 +6,7 @@ import gym.spaces as spaces
 import minerl  # noqa
 import numpy as np
 import torch as th
+import wandb
 from imitation.algorithms import preference_comparisons
 from imitation.rewards.reward_nets import CnnRewardNet, NormalizedRewardNet
 from imitation.util import logger as imit_logger
@@ -15,7 +16,6 @@ from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.ppo.ppo import PPO
 
 import sb3_minerl_envs  # noqa
-import wandb
 from impala_based_models import ImpalaRewardNet
 from openai_vpt.agent import MineRLAgent
 from sb3_policy_wrapper import MinecraftActorCriticPolicy
@@ -40,18 +40,18 @@ def preference_based_RL_train(
     seed = 0
 
     # Reward model training
-    n_iterations = 10
+    n_iterations = 1
     n_epochs_reward_model = 3
-    batch_size_reward_model = 8
+    batch_size_reward_model = 4
     lr_reward_model = 0.001
-    n_comparisons = 1000
-    comparison_queue_size = 10  # None = unbounded queue size
-    initial_comparison_frac = 0.01
-    fragment_length = 40
-    discount_factor = 0.99
+    n_comparisons = 8
+    comparison_queue_size = 0  # None = unbounded queue size
+    initial_comparison_frac = 0.5
+    fragment_length = 20
+    discount_factor = 0.999
 
     # PPO
-    n_total_steps_ppo = 200000
+    n_total_steps_ppo = 2000
     n_epochs_ppo = 3
     n_steps_ppo = 512
     lr_ppo = 0.000181
@@ -193,7 +193,7 @@ def preference_based_RL_train(
         custom_logger=logger,
     )
 
-    pref_comparisons = preference_comparisons.MineRLPreferenceComparisons(
+    pref_comparisons = preference_comparisons.PreferenceComparisons(
         trajectory_generator,
         reward_net,
         num_iterations=n_iterations,
