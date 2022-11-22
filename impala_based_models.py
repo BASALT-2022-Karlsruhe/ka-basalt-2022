@@ -6,7 +6,8 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from imitation.rewards.reward_nets import RewardNet
-from imitation.util import networks
+from imitation.util import networks, util
+from stable_baselines3.common import preprocessing
 
 from behavioural_cloning import load_model_parameters
 from openai_vpt.agent import MineRLAgent
@@ -77,7 +78,7 @@ class ImpalaLinear(nn.Module):
 
     def load_cnn_weights(self, model_path="data/VPT-models"):
         weights_path = os.path.join(model_path, f"ImpalaCNN-{self.cnn_width}x.weights")
-        if not os.path.is_file(weights_path):
+        if not os.path.isfile(weights_path):
             save_impala_cnn_weights(self.cnn_width)
         self.cnn.load_state_dict(th.load(weights_path))
 
@@ -159,6 +160,27 @@ class ImpalaRewardNet(RewardNet):
                 rew_th = self(state_th, action_th, next_state_th, done_th).unsqueeze(0)
             assert rew_th.shape == state.shape[:1]
         return rew_th
+    
+    def preprocess(
+        self,
+        state: np.ndarray,
+        action: np.ndarray,
+        next_state: np.ndarray,
+        done: np.ndarray,
+    ):
+        """Preprocess a batch of input transitions and convert it to PyTorch tensors
+        This class only usese `state` so does not convert the other arguments.
+        """
+        state_th = util.safe_to_tensor(state).to(self.device)
+        state_th = preprocessing.preprocess_obs(
+            state_th,
+            self.observation_space,
+            self.normalize_images,
+        )
+        del state
+        state = state_th
+        
+        return state, action, next_state, done
 
 
 def save_impala_cnn_weights(model_width=1):
