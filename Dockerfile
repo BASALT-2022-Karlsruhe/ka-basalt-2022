@@ -11,7 +11,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 USER root
 COPY apt.txt apt.txt
 RUN apt -qq update && xargs -a apt.txt apt -qq install -y --no-install-recommends \
- && rm -rf /var/cache/*
+    && rm -rf /var/cache/*
 
 # Set the user and conda environment paths
 USER aicrowd
@@ -26,6 +26,7 @@ SHELL ["conda", "run", "-n", "minerl", "/bin/bash", "-c"]
 # Conda environment update
 COPY environment.yml environment.yml
 RUN conda env update --name minerl -f environment.yml --prune
+RUN pip install -e ./imitation
 
 # Copy the files
 COPY --chown=1001:1001 . /home/aicrowd

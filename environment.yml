@@ -9,6 +9,7 @@ dependencies:
   - wandb
   - py-opencv
   - pip:
+    - pyvirtualdisplay
     - git+https://github.com/minerllabs/minerl
     - matplotlib
     - tqdm
@@ -20,7 +21,6 @@ dependencies:
     - --extra-index-url https://download.pytorch.org/whl/cu113
     - torch==1.12.1+cu113
     - werkzeug==2.1
-    - git+https://github.com/rk1a/imitation.git@human-preferences
     - opencv-python-headless
     - django
     - djangorestframework
