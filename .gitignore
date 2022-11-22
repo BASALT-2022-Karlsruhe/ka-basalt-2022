@@ -7,6 +7,7 @@ Dockerfile-full
 
 watcher_*
 demo_segmentation/example_segmentations
+cached_preference_dataset
 videos
 runs
 models
