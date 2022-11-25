@@ -19,7 +19,7 @@ services:
         git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
-      - 8000:8000
+      - 8001:8000
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_${DATA_ROOT}
@@ -41,8 +41,7 @@ volumes:
     external: true
   models:
     name: ka-basalt-2022-models-${NAME}-${VERSION}
-    driver: local
     driver_opts:
-      type: none
-      device: ${MODELS_ROOT}/${NAME}_${VERSION}
-      o: bind
+      type: "nfs"
+      o: "addr=ipe-wombat.fzi.de,nolock,soft,rw"
+      device: ":/data/share/BASALT2_models"
