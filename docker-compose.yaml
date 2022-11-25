@@ -19,7 +19,7 @@ services:
         git_access_token: ${GIT_ACCESS_TOKEN}
     ports:
       - ${PORT}:9999
-      - 8001:8000
+      - ${PREF_PORT}:8000
     volumes:
       - type: volume
         source: ka-basalt-2022-datadownloader_${DATA_ROOT}
