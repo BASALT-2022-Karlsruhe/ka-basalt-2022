@@ -41,8 +41,7 @@ volumes:
     external: true
   models:
     name: ka-basalt-2022-models-${NAME}-${VERSION}
-    driver: local
     driver_opts:
-      type: none
-      device: ${MODELS_ROOT}/${NAME}_${VERSION}
-      o: bind
+      type: "nfs"
+      o: "addr=ipe-wombat.fzi.de,nolock,soft,rw"
+      device: ":/data/share/BASALT2_models"

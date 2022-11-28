@@ -1,18 +1,16 @@
-from datetime import datetime
 import os
+from datetime import datetime
 
-from tqdm import tqdm
+import cv2
 import numpy as np
 import torch as th
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split
-import cv2
-
+from impala_based_models import ImpalaBinaryClassifier
+from openai_vpt.agent import AGENT_RESOLUTION, resize_image
+from torch.utils.data import DataLoader, Dataset, random_split
+from tqdm import tqdm
 from utils import create_subfolders
 from utils.logs import Logging
-from openai_vpt.agent import resize_image, AGENT_RESOLUTION
-from impala_based_models import ImpalaBinaryClassifier
-
 
 LOG_FILE = (
     f"find_cave_classifier_log_{datetime.now().strftime('%Y:%m:%d_%H:%M:%S')}.log"
